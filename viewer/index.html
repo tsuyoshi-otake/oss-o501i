@@ -2,12 +2,13 @@
 <html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OSS O501i · Sprite viewer</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f4f3ed;color:#24382f;font-family:"DM Sans",system-ui,sans-serif}main{max-width:940px;margin:0 auto;padding:clamp(16px,4vw,44px)}header,footer,.tools{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}header{border-bottom:1px solid #a3ada1;padding-bottom:15px}h1{font-size:clamp(26px,4vw,44px);font-weight:550;letter-spacing:-.055em;margin:0}header span,output{font:12px monospace;letter-spacing:.08em}.stage{position:relative;background:radial-gradient(ellipse at 48% 48%,#fafaf4,#e4e7dd);margin:16px 0;border:1px solid #c6cbbf;border-radius:12px;overflow:hidden}canvas{display:block;width:100%;height:clamp(360px,65vh,640px);touch-action:pan-y;cursor:grab}canvas:active{cursor:grabbing}.hint{position:absolute;bottom:12px;left:16px;font-size:11px;color:#59695c;pointer-events:none}.tools{justify-content:flex-start}button{background:#fafaf6;border:1px solid #adb7a9;color:inherit;border-radius:7px;padding:9px 14px;cursor:pointer}button[aria-pressed=true]{background:#2e4937;color:white}label{font-size:13px;display:flex;gap:10px;align-items:center}input{accent-color:#36583e;width:clamp(100px,22vw,220px)}footer{font-size:12px;color:#556257;margin-top:16px}output{min-width:5ch}
+*{box-sizing:border-box}body{margin:0;background:#f4f3ed;color:#24382f;font-family:"DM Sans",system-ui,sans-serif}main{max-width:940px;margin:0 auto;padding:clamp(16px,4vw,44px)}header,footer,.tools{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}header{border-bottom:1px solid #a3ada1;padding-bottom:15px}h1{font-size:clamp(26px,4vw,44px);font-weight:550;letter-spacing:-.055em;margin:0}header span,output{font:12px monospace;letter-spacing:.08em}.stage{position:relative;background:radial-gradient(ellipse at 48% 48%,#fafaf4,#e4e7dd);margin:16px 0;border:1px solid #c6cbbf;border-radius:12px;overflow:hidden}canvas{display:block;width:100%;height:clamp(360px,65vh,640px);touch-action:pan-y;cursor:grab}canvas:active{cursor:grabbing}.hint{position:absolute;bottom:12px;left:16px;font-size:11px;color:#59695c;pointer-events:none}.tools{justify-content:flex-start;margin-bottom:10px}.lcd-state{font-weight:600;color:#304c3a}button{background:#fafaf6;border:1px solid #adb7a9;color:inherit;border-radius:7px;padding:9px 14px;cursor:pointer}button[aria-pressed=true]{background:#2e4937;color:white}label{font-size:13px;display:flex;gap:10px;align-items:center}input{accent-color:#36583e;width:clamp(100px,22vw,220px)}footer{font-size:12px;color:#556257;margin-top:16px}output{min-width:5ch}
 </style>
 <main><header><h1>OSS O501i</h1><span>SPRITE STACK VIEWER</span></header>
-<div class="stage"><canvas aria-label="銀色の折りたたみ携帯電話 OSS O501i。下の回転角で向きを変更できます。"></canvas><span class="hint">左右にドラッグして回転</span></div>
+<div class="stage"><canvas aria-label="銀色の折りたたみ携帯電話 OSS O501i。下の回転角で向きを変更できます。"></canvas><span class="hint">左右ドラッグで回転 ／ 本体キーをタップ</span></div>
 <div class="tools"><label>回転角 <input id="angle" type="range" min="-180" max="180" value="-24"></label><output for="angle"></output><button id="front">正面</button><button id="back">背面</button><button id="spin" aria-pressed="false">自動回転</button></div>
-<footer>背面と側面は正面画像から推定した形状です。</footer></main>
+<div class="tools"><label>開き角 <input id="fold" type="range" min="0" max="180" value="165"></label><output id="foldValue" for="fold"></output><button id="closeLid">閉じる</button><button id="openLid">開く</button></div>
+<div class="tools" aria-label="携帯の操作"><button data-key="mail">メール</button><button data-key="menu">メニュー</button><button data-key="up">▲</button><button data-key="down">▼</button><button data-key="ok">決定</button><button data-key="clear">戻る</button></div><span class="lcd-state" role="status"></span><footer>数字・矢印・Enter・Esc キーでも操作できます。メールと発着信は端末内のデモです。背面と側面は正面画像から推定した形状です。</footer></main>
 <script>
 const canvas=document.querySelector('canvas'), ctx=canvas.getContext('2d');
 const slider=document.querySelector('#angle'), output=document.querySelector('output');
@@ -64,46 +65,157 @@ function drawHinge(){
  const stops=['#696b68','#c4c1b9','#fffaf0','#acaaa4','#777973'];
  for(const [x,w] of [[-42,13],[-28,8],[-19,20],[2,26],[29,13]])round(x,-9,w,21,2,gradient(-9,21,stops),'#969690')
 }
-let yaw=-24, spinning=false, previous=0;
-function draw(){
- const w=canvas.clientWidth,h=canvas.clientHeight;
- // Oversample even on 1x displays; browser compositing downsamples the final image.
- const aa=Math.min(3,Math.max(2,window.devicePixelRatio||1));
- if(canvas.width!==Math.round(w*aa)||canvas.height!==Math.round(h*aa)){canvas.width=Math.round(w*aa);canvas.height=Math.round(h*aa)}
- ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
- const scale=Math.min(w/165,h/405)*aa,a=yaw*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
- const ox=canvas.width/2,oy=canvas.height/2+12*scale;
- const side=c>=0?1:-1;
- function plane(z,inset=1){
-  const projected=Math.abs(c)<.012?.012*side:c;
-  ctx.setTransform(scale*projected*inset,scale*.09*s*inset,0,scale*inset,ox+scale*s*z,oy-scale*.09*c*z)
- }
- // Back-to-front parallel silhouette sprites. Close spacing also fills edge-on views.
- for(let i=0;i<=96;i++){
-  const t=i/96,z=side*(t*24-12),bevel=1-.035*Math.pow(Math.abs(2*t-1),5);
-  plane(z,bevel);
-  const seam=Math.abs(z+2)<.8;
-  const shade=seam?105:Math.round(164+32*Math.cos((z-3)*.16));
-  ctx.fillStyle='rgb('+shade+','+(shade-1)+','+(shade-5)+')';
-  ctx.fill(upper);ctx.fill(lower);
-  if(Math.abs(z+5)<6){ctx.fillStyle='#b6b6a7';ctx.fill(antenna)}
-  round(-42,-8,84,20,2,'#a09f99');
- }
- plane(side*12,.965);
- if(side>0)drawFace();else drawBack();
- drawHinge();output.value=Math.round(yaw)+'°';slider.value=Math.round(yaw)
+const screens={
+ menu:{title:'メニュー',items:['メール','電話帳','着信音設定']},
+ mail:{title:'受信メール',items:['ようこそ']},
+ contacts:{title:'電話帳',items:['自宅','オフィス']},
+ tones:{title:'着信音設定',items:['ベル 1','ベル 2','電子音']}
+};
+let screen='home',selection=0,tone=0,digits='',message='',returnTo='home';
+let opening=165,yaw=-24,spinning=false,lastTime=0,motion=null,frameId=0;
+const keymap=[['mail','up','menu'],['left','ok','right'],['mail','down','menu'],['call','clear','end'],['1','2','3'],['4','5','6'],['7','8','9'],['*','0','#']];
+const fold=document.querySelector('#fold'),spin=document.querySelector('#spin');
+let keypadMatrix, lidBlocks=[],upperInFront=false;
+function go(next){screen=next;selection=next==='tones'?tone:0}
+function playTone(n){
+ const Audio=window.AudioContext||window.webkitAudioContext;
+ if(!Audio)return;
+ const audio=playTone.audio||(playTone.audio=new Audio());
+ audio.resume().catch(()=>{});
+ [0,1,2].forEach(i=>{
+  const osc=audio.createOscillator(),amp=audio.createGain(),t=audio.currentTime+i*.11;
+  osc.frequency.value=[[660,880,660],[880,660,990],[1046,1046,784]][n][i];
+  amp.gain.setValueAtTime(.045,t);amp.gain.exponentialRampToValueAtTime(.001,t+.09);
+  osc.connect(amp);amp.connect(audio.destination);osc.start(t);osc.stop(t+.1)
+ })
 }
-function setAngle(v){yaw=((v+540)%360)-180;draw()}
+function key(k){
+ if(opening<12)return;
+ const list=screens[screen];
+ if(k==='end'){digits='';go('home')}
+ else if(k==='clear'){
+  if(screen==='dial'&&digits.length>1)digits=digits.slice(0,-1);
+  else if(screen==='note')go('mail');
+  else if(screen==='call')go(returnTo);
+  else if(['mail','contacts','tones'].includes(screen))go('menu');
+  else{digits='';go('home')}
+ }else if(k==='menu')go('menu');
+ else if(k==='mail')go('mail');
+ else if(/^[0-9*#]$/.test(k)&&(screen==='home'||screen==='dial')){
+  if(screen==='home')digits='';digits=(digits+k).slice(0,16);go('dial')
+ }else if(list&&['up','left','down','right'].includes(k)){
+  selection=(selection+(['up','left'].includes(k)?-1:1)+list.items.length)%list.items.length
+ }else if(k==='ok'||k==='call'){
+  if(screen==='menu')go(['mail','contacts','tones'][selection]);
+  else if(screen==='mail')go('note');
+  else if(screen==='tones'){tone=selection;playTone(tone)}
+  else if(screen==='contacts'||(screen==='dial'&&digits)){
+   returnTo=screen;message=screen==='contacts'?list.items[selection]:digits;go('call')
+  }else if(screen==='home')go(k==='call'?'dial':'menu')
+ }
+ draw()
+}
+function lcd(){
+ const ink='#24342c',paper='#a9b39f';
+ ctx.fillStyle=paper;ctx.fillRect(-29,-112,58,73);
+ label('▴ ▮▮▮                  ▰',0,-106,5,ink);
+ if(screen==='home'){
+  label('OSS O501i',0,-95,10,ink,true);label('4/1 (火)',0,-85,7,ink);label('9:00',0,-73,12,ink,true);
+  ctx.fillStyle='#607261';ctx.fill(new Path2D('M -29 -51 L -15 -55 L -2 -68 L 4 -64 L 9 -61 L 19 -54 L 29 -50 Z'));
+  ctx.fillStyle='#c8cfb8';ctx.fill(new Path2D('M -8 -62 L -2 -68 L 5 -62 L 1 -64 L 0 -62 L -3 -64 Z'));
+ }else{
+  const list=screens[screen];label(list?.title||({dial:'番号入力',note:'受信メール',call:'発信デモ'})[screen],0,-96,7.5,ink,true);
+  if(list)list.items.forEach((v,i)=>{
+   const y=-86+i*10;if(i===selection){ctx.fillStyle=ink;ctx.fillRect(-27,y-6.5,54,9)}
+   label((screen==='tones'&&i===tone?'♪ ':'')+v,0,y,6.5,i===selection?paper:ink)
+  });
+  else{
+   const lines=screen==='dial'?[digits.slice(0,8),digits.slice(8)]:screen==='call'?[message.slice(0,8),message.slice(8),'呼出中…']:['ようこそ！','OSS O501i から','最初のメールです。'];
+   lines.forEach((v,i)=>label(v,0,-82+i*10,7,ink))
+  }
+ }
+ round(-28,-49,56,.65,0,ink);label(screen==='home'?'✉ メール     メニュー':'戻る         決定',0,-42,5.5,ink)
+}
+function draw(){
+ const w=canvas.clientWidth,h=canvas.clientHeight,aa=Math.min(3,Math.max(2,window.devicePixelRatio||1));
+ if(canvas.width!==Math.round(w*aa)||canvas.height!==Math.round(h*aa)){canvas.width=Math.round(w*aa);canvas.height=Math.round(h*aa)}
+ ctx.resetTransform();ctx.clearRect(0,0,canvas.width,canvas.height);
+ const a=yaw*Math.PI/180,c=Math.cos(a),s=Math.sin(a),f=(180-opening)*Math.PI/180;
+ const scale=Math.min(w/265,h/405)*aa,ox=canvas.width/2-scale*s*75*Math.sin(f);
+ const oy=canvas.height/2-scale*(172+Math.min(0,-197*Math.cos(f)))/2;
+ lidBlocks=[];
+ function body(isLid){
+  const C=isLid?Math.cos(f):1,S=isLid?Math.sin(f):0,shape=isLid?upper:lower;
+  const facing=c*C+.09*S,side=facing>=0?1:-1;
+  function plane(z,inset){
+   // Rotate the lid around the pin in front of the two inner faces.
+   const y0=(z-13)*S,z0=13+(z-13)*C;
+   ctx.setTransform(scale*c*inset,scale*.09*s*inset,-scale*s*S*inset,scale*(C+.09*c*S)*inset,ox+scale*s*z0,oy+scale*(y0-.09*c*z0))
+  }
+  for(let i=0;i<=96;i++){
+   const z=side*(i/4-12),bevel=1-.035*Math.pow(Math.abs(z/12),5);
+   plane(z,bevel);
+   if(isLid&&i%4===0)lidBlocks.push(ctx.getTransform());
+   const shade=Math.abs(z+2)<.8?105:Math.round(164+32*Math.cos((z-3)*.16));
+   ctx.fillStyle='rgb('+shade+','+(shade-1)+','+(shade-5)+')';ctx.fill(shape);
+   if(isLid&&Math.abs(z+5)<6){ctx.fillStyle='#aaa99c';ctx.fill(antenna)}
+  }
+  plane(side*12,.965);ctx.save();ctx.clip(shape);
+  if(side>0){drawFace();if(isLid)lcd()}else drawBack();
+  ctx.restore();
+  if(!isLid){keypadMatrix=side>0?ctx.getTransform():null;plane(12,1);drawHinge()}
+ }
+ upperInFront=c*Math.sin(f/2)-.09*Math.cos(f/2)>=0;
+ body(!upperInFront);body(upperInFront);
+ ctx.resetTransform();output.value=Math.round(yaw)+'°';slider.value=Math.round(yaw);
+ fold.value=Math.round(opening);document.querySelector('#foldValue').value=Math.round(opening)+'°';
+ const status=opening<12?'閉じています':screens[screen]?.title||({home:'待受',dial:'番号入力',call:'発信デモ',note:'受信メール'})[screen];
+ const live=document.querySelector('.lcd-state');if(live.textContent!==status)live.textContent=status;
+ document.querySelectorAll('[data-key]').forEach(b=>b.disabled=opening<12)
+}
+function tick(now){
+ frameId=0;
+ if(spinning)yaw=((yaw+Math.min(64,now-lastTime)*.025+540)%360)-180;
+ if(motion){
+  const t=Math.min(1,(now-motion.start)/480);
+  opening=motion.from+(motion.to-motion.from)*t*t*(3-2*t);
+  if(t===1)motion=null
+ }
+ lastTime=now;draw();if(spinning||motion)schedule()
+}
+function schedule(){if(!frameId)frameId=requestAnimationFrame(tick)}
+function moveLid(to){
+ if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){motion=null;opening=to;draw();return}
+ motion={from:opening,to,start:performance.now()};schedule()
+}
 function stop(){spinning=false;spin.setAttribute('aria-pressed','false')}
-const spin=document.querySelector('#spin');
-function frame(now){if(!spinning)return;setAngle(yaw+Math.min(80,now-previous)*.025);previous=now;requestAnimationFrame(frame)}
-spin.onclick=()=>{if(spinning){stop();return}spinning=true;previous=performance.now();spin.setAttribute('aria-pressed','true');requestAnimationFrame(frame)};
+spin.onclick=()=>{if(spinning){stop();return}spinning=true;lastTime=performance.now();spin.setAttribute('aria-pressed','true');schedule()};
 slider.oninput=()=>{stop();yaw=Number(slider.value);draw()};
-document.querySelector('#front').onclick=()=>{stop();setAngle(0)};
-document.querySelector('#back').onclick=()=>{stop();setAngle(180)};
+fold.oninput=()=>{motion=null;opening=Number(fold.value);draw()};
+document.querySelector('#closeLid').onclick=()=>moveLid(0);
+document.querySelector('#openLid').onclick=()=>moveLid(180);
+document.querySelector('#front').onclick=()=>{stop();yaw=0;draw()};
+document.querySelector('#back').onclick=()=>{stop();yaw=-180;draw()};
+document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>key(b.dataset.key));
+window.addEventListener('keydown',e=>{
+ if(e.target.matches('input')||e.ctrlKey||e.altKey||e.metaKey||(e.target.matches('button')&&e.key==='Enter'))return;
+ const mapped=({ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',Enter:'ok',Escape:'clear',Backspace:'clear'})[e.key]||(/^[0-9*#]$/.test(e.key)?e.key:null);
+ if(mapped){e.preventDefault();key(mapped)}
+});
+function tap(e){
+ if(!keypadMatrix||opening<12)return;
+ const rect=canvas.getBoundingClientRect(),px=(e.clientX-rect.left)*canvas.width/rect.width,py=(e.clientY-rect.top)*canvas.height/rect.height;
+ function local(matrix){return new DOMPoint(px,py).matrixTransform(matrix.inverse())}
+ if(upperInFront&&lidBlocks.some(m=>{const p=local(m);return ctx.isPointInPath(upper,p.x,p.y)||ctx.isPointInPath(antenna,p.x,p.y)}))return;
+ const p=local(keypadMatrix),r=Math.round((p.y-29)/14.8),c=Math.round(p.x/24)+1;
+ if(keymap[r]?.[c]&&Math.abs(p.x-(c-1)*24)<12&&Math.abs(p.y-(29+r*14.8))<7.4){
+  const soft=r===0&&screen!=='home';key(soft&&c===0?'clear':soft&&c===2?'ok':keymap[r][c])
+ }
+}
 let drag=null;
-canvas.onpointerdown=e=>{stop();drag={x:e.clientX,yaw};canvas.setPointerCapture(e.pointerId)};
-canvas.onpointermove=e=>{if(drag)setAngle(drag.yaw+(e.clientX-drag.x)*.65)};
+canvas.onpointerdown=e=>{stop();drag={x:e.clientX,y:e.clientY,yaw,moved:false};canvas.setPointerCapture(e.pointerId)};
+canvas.onpointermove=e=>{if(!drag)return;if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>4)drag.moved=true;if(drag.moved){yaw=((drag.yaw+(e.clientX-drag.x)*.65+540)%360+360)%360-180;draw()}};
+canvas.onpointerup=e=>{if(drag&&!drag.moved)tap(e);drag=null};
 canvas.onlostpointercapture=()=>{drag=null};
 new ResizeObserver(draw).observe(canvas);draw()
 </script></html>
