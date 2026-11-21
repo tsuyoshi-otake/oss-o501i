@@ -2,15 +2,15 @@
 <html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OSS O501i · Sprite viewer</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f4f3ed;color:#24382f;font-family:"DM Sans",system-ui,sans-serif}main{max-width:940px;margin:0 auto;padding:clamp(16px,4vw,44px)}header,footer,.tools{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}header{border-bottom:1px solid #a3ada1;padding-bottom:15px}h1{font-size:clamp(26px,4vw,44px);font-weight:550;letter-spacing:-.055em;margin:0}header span,output{font:12px monospace;letter-spacing:.08em}.stage{position:relative;background:radial-gradient(ellipse at 48% 48%,#fafaf4,#e4e7dd);margin:16px 0;border:1px solid #c6cbbf;border-radius:12px;overflow:hidden}canvas{display:block;width:100%;height:clamp(360px,65vh,640px);touch-action:pan-y;cursor:grab}canvas:active{cursor:grabbing}.hint{position:absolute;bottom:12px;left:16px;font-size:11px;color:#59695c;pointer-events:none}.tools{justify-content:flex-start;margin-bottom:10px}.lcd-state{font-weight:600;color:#304c3a}button{background:#fafaf6;border:1px solid #adb7a9;color:inherit;border-radius:7px;padding:9px 14px;cursor:pointer}button[aria-pressed=true]{background:#2e4937;color:white}label{font-size:13px;display:flex;gap:10px;align-items:center}input{accent-color:#36583e;width:clamp(100px,22vw,220px)}footer{font-size:12px;color:#556257;margin-top:16px}output{min-width:5ch}
+*{box-sizing:border-box}body{margin:0;background:#f4f3ed;color:#24382f;font-family:"DM Sans",system-ui,sans-serif}main{max-width:940px;margin:0 auto;padding:clamp(16px,4vw,44px)}header,footer,.tools{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}header{border-bottom:1px solid #a3ada1;padding-bottom:15px}h1{font-size:clamp(26px,4vw,44px);font-weight:550;letter-spacing:-.055em;margin:0}header span,output{font:12px monospace;letter-spacing:.08em}.stage{position:relative;background:radial-gradient(ellipse at 48% 48%,#fafaf4,#e4e7dd);margin:16px 0;border:1px solid #c6cbbf;border-radius:12px;overflow:hidden}canvas{display:block;width:100%;height:clamp(360px,65vh,640px);touch-action:pan-y;cursor:grab}canvas:active{cursor:grabbing}.hint{position:absolute;bottom:12px;left:16px;font-size:11px;color:#59695c;pointer-events:none}.tools{justify-content:flex-start;margin-bottom:10px}.lcd-state{font-weight:600;color:#304c3a}button{background:#fafaf6;border:1px solid #adb7a9;color:inherit;border-radius:7px;padding:9px 14px;cursor:pointer}button[aria-pressed=true]{background:#2e4937;color:white}label{font-size:13px;display:flex;gap:10px;align-items:center}input{accent-color:#36583e;width:clamp(100px,22vw,220px)}details{margin:12px 0}summary{cursor:pointer}#lcdZoom{width:174px;max-width:100%;height:auto;image-rendering:pixelated;margin:10px 0}.tools input[type=checkbox]{width:auto}footer{font-size:12px;color:#556257;margin-top:16px}output{min-width:5ch}
 </style>
 <main><header><h1>OSS O501i</h1><span>SPRITE STACK VIEWER</span></header>
 <div class="stage"><canvas aria-label="銀色の折りたたみ携帯電話 OSS O501i。下の回転角で向きを変更できます。"></canvas><span class="hint">左右ドラッグで回転 ／ 本体キーをタップ</span></div>
 <div class="tools"><label>回転角 <input id="angle" type="range" min="-180" max="180" value="-24"></label><output for="angle"></output><button id="front">正面</button><button id="back">背面</button><button id="spin" aria-pressed="false">自動回転</button></div>
 <div class="tools"><label>開き角 <input id="fold" type="range" min="0" max="180" value="165"></label><output id="foldValue" for="fold"></output><button id="closeLid">閉じる</button><button id="openLid">開く</button></div>
-<div class="tools" aria-label="携帯の操作"><button data-key="mail">メール</button><button data-key="menu">メニュー</button><button data-key="up">▲</button><button data-key="down">▼</button><button data-key="ok">決定</button><button data-key="clear">戻る</button></div><span class="lcd-state" role="status"></span><footer>数字・矢印・Enter・Esc キーでも操作できます。メールと発着信は端末内のデモです。背面と側面は正面画像から推定した形状です。</footer></main>
+<div class="tools" aria-label="携帯の操作"><button data-key="mail">メール</button><button data-key="menu">メニュー</button><button data-key="up">▲</button><button data-key="down">▼</button><button data-key="ok">決定</button><button data-key="clear">戻る</button></div><div class="tools"><button id="ring">着信させる</button><button data-key="call">応答／発信</button><button data-key="end">終話</button><label><input type="checkbox" id="sound" checked>音を鳴らす</label></div><details><summary>液晶を拡大</summary><canvas id="lcdZoom" width="116" height="146" aria-label="本体と同じ液晶画面"></canvas></details><span class="lcd-state" role="status"></span><footer>数字・矢印・Enter・Esc キーでも操作できます。メールと発着信は端末内のデモです。背面と側面は正面画像から推定した形状です。</footer></main>
 <script>
-const canvas=document.querySelector('canvas'), ctx=canvas.getContext('2d');
+const canvas=document.querySelector('canvas');let ctx=canvas.getContext('2d');
 const slider=document.querySelector('#angle'), output=document.querySelector('output');
 const upper=new Path2D('M -42 -4 L -42 -141 Q -42 -155 -29 -159 Q -4 -169 23 -162 Q 42 -158 42 -144 L 43 -5 Q 43 -2 38 -2 L -39 -2 Z');
 const lower=new Path2D('M -42 10 Q -43 5 -37 5 L 37 5 Q 43 5 43 13 L 44 145 Q 44 159 31 165 Q 3 179 -29 168 Q -43 163 -43 149 Z');
@@ -77,11 +77,26 @@ const keymap=[['mail','up','menu'],['left','ok','right'],['mail','down','menu'],
 const fold=document.querySelector('#fold'),spin=document.querySelector('#spin');
 let keypadMatrix, lidBlocks=[],upperInFront=false;
 function go(next){screen=next;selection=next==='tones'?tone:0}
-function playTone(n){
+const sound=document.querySelector('#sound');
+function audioContext(){
+ if(!sound.checked)return;
  const Audio=window.AudioContext||window.webkitAudioContext;
  if(!Audio)return;
- const audio=playTone.audio||(playTone.audio=new Audio());
- audio.resume().catch(()=>{});
+ const audio=audioContext.current||(audioContext.current=new Audio());
+ audio.resume().catch(()=>{});return audio
+}
+function dialTone(k){
+ const at='123456789*0#'.indexOf(k),audio=audioContext();
+ if(!audio||at<0)return;
+ const t=audio.currentTime;
+ for(const hz of [[697,770,852,941][Math.floor(at/3)],[1209,1336,1477][at%3]]){
+  const osc=audio.createOscillator(),gain=audio.createGain();
+  osc.frequency.value=hz;gain.gain.setValueAtTime(.024,t);gain.gain.exponentialRampToValueAtTime(.001,t+.085);
+  osc.connect(gain);gain.connect(audio.destination);osc.start(t);osc.stop(t+.09)
+ }
+}
+function playTone(n){
+ const audio=audioContext();if(!audio)return;
  [0,1,2].forEach(i=>{
   const osc=audio.createOscillator(),amp=audio.createGain(),t=audio.currentTime+i*.11;
   osc.frequency.value=[[660,880,660],[880,660,990],[1046,1046,784]][n][i];
@@ -89,8 +104,19 @@ function playTone(n){
   osc.connect(amp);amp.connect(audio.destination);osc.start(t);osc.stop(t+.1)
  })
 }
+let ringTimer=0;
+function silenceRing(){clearInterval(ringTimer);ringTimer=0}
+window.addEventListener('pagehide',silenceRing);
+document.querySelector('#ring').onclick=()=>{
+ silenceRing();go('incoming');playTone(tone);ringTimer=setInterval(()=>playTone(tone),1800);draw()
+};
 function key(k){
  if(opening<12)return;
+ if(screen==='incoming'||screen==='talking'){
+  if(k==='end'||k==='clear'){silenceRing();go('home')}
+  else if(screen==='incoming'&&(k==='ok'||k==='call')){silenceRing();go('talking')}
+  draw();return
+ }
  const list=screens[screen];
  if(k==='end'){digits='';go('home')}
  else if(k==='clear'){
@@ -102,7 +128,7 @@ function key(k){
  }else if(k==='menu')go('menu');
  else if(k==='mail')go('mail');
  else if(/^[0-9*#]$/.test(k)&&(screen==='home'||screen==='dial')){
-  if(screen==='home')digits='';digits=(digits+k).slice(0,16);go('dial')
+  dialTone(k);if(screen==='home')digits='';digits=(digits+k).slice(0,16);go('dial')
  }else if(list&&['up','left','down','right'].includes(k)){
   selection=(selection+(['up','left'].includes(k)?-1:1)+list.items.length)%list.items.length
  }else if(k==='ok'||k==='call'){
@@ -115,7 +141,27 @@ function key(k){
  }
  draw()
 }
+const lcdZoom=document.querySelector('#lcdZoom');
+const lcdPixels=lcdZoom.getContext('2d',{willReadFrequently:true});
+let lcdCache='';
 function lcd(){
+ const visible=opening>=12;
+ const signature=JSON.stringify([visible,screen,selection,tone,digits,message]);
+ if(signature!==lcdCache){
+  const bodyContext=ctx;ctx=lcdPixels;
+  try{
+   ctx.setTransform(2,0,0,2,58,224);
+   if(visible)paintLcd();else{ctx.fillStyle='#a9b39f';ctx.fillRect(-29,-112,58,73)}
+   const pixels=ctx.getImageData(0,0,116,146),d=pixels.data;
+   for(let i=0;i<d.length;i+=4){
+    const dark=d[i+1]<139;
+    d[i]=dark?38:169;d[i+1]=dark?55:179;d[i+2]=dark?44:159;d[i+3]=255
+   }
+   ctx.resetTransform();ctx.putImageData(pixels,0,0);lcdCache=signature
+  }finally{ctx=bodyContext}
+ }
+}
+function paintLcd(){
  const ink='#24342c',paper='#a9b39f';
  ctx.fillStyle=paper;ctx.fillRect(-29,-112,58,73);
  label('▴ ▮▮▮                  ▰',0,-106,5,ink);
@@ -124,17 +170,17 @@ function lcd(){
   ctx.fillStyle='#607261';ctx.fill(new Path2D('M -29 -51 L -15 -55 L -2 -68 L 4 -64 L 9 -61 L 19 -54 L 29 -50 Z'));
   ctx.fillStyle='#c8cfb8';ctx.fill(new Path2D('M -8 -62 L -2 -68 L 5 -62 L 1 -64 L 0 -62 L -3 -64 Z'));
  }else{
-  const list=screens[screen];label(list?.title||({dial:'番号入力',note:'受信メール',call:'発信デモ'})[screen],0,-96,7.5,ink,true);
+  const list=screens[screen];label(list?.title||({dial:'番号入力',note:'受信メール',call:'発信デモ',incoming:'着信中',talking:'通話中'})[screen],0,-96,7.5,ink,true);
   if(list)list.items.forEach((v,i)=>{
    const y=-86+i*10;if(i===selection){ctx.fillStyle=ink;ctx.fillRect(-27,y-6.5,54,9)}
    label((screen==='tones'&&i===tone?'♪ ':'')+v,0,y,6.5,i===selection?paper:ink)
   });
   else{
-   const lines=screen==='dial'?[digits.slice(0,8),digits.slice(8)]:screen==='call'?[message.slice(0,8),message.slice(8),'呼出中…']:['ようこそ！','OSS O501i から','最初のメールです。'];
+   const lines=screen==='incoming'?['オフィス','応答 ／ 拒否']:screen==='talking'?['オフィス','通話デモ']:screen==='dial'?[digits.slice(0,8),digits.slice(8)]:screen==='call'?[message.slice(0,8),message.slice(8),'呼出中…']:['ようこそ！','OSS O501i から','最初のメールです。'];
    lines.forEach((v,i)=>label(v,0,-82+i*10,7,ink))
   }
  }
- round(-28,-49,56,.65,0,ink);label(screen==='home'?'✉ メール     メニュー':'戻る         決定',0,-42,5.5,ink)
+ round(-28,-49,56,.65,0,ink);label(screen==='home'?'✉ メール     メニュー':screen==='incoming'?'拒否         応答':screen==='talking'?'終話':'戻る         決定',0,-42,5.5,ink)
 }
 function draw(){
  const w=canvas.clientWidth,h=canvas.clientHeight,aa=Math.min(3,Math.max(2,window.devicePixelRatio||1));
@@ -143,7 +189,7 @@ function draw(){
  const a=yaw*Math.PI/180,c=Math.cos(a),s=Math.sin(a),f=(180-opening)*Math.PI/180;
  const scale=Math.min(w/265,h/405)*aa,ox=canvas.width/2-scale*s*75*Math.sin(f);
  const oy=canvas.height/2-scale*(172+Math.min(0,-197*Math.cos(f)))/2;
- lidBlocks=[];
+ lcd();lidBlocks=[];
  function body(isLid){
   const C=isLid?Math.cos(f):1,S=isLid?Math.sin(f):0,shape=isLid?upper:lower;
   const facing=c*C+.09*S,side=facing>=0?1:-1;
@@ -161,7 +207,7 @@ function draw(){
    if(isLid&&Math.abs(z+5)<6){ctx.fillStyle='#aaa99c';ctx.fill(antenna)}
   }
   plane(side*12,.965);ctx.save();ctx.clip(shape);
-  if(side>0){drawFace();if(isLid)lcd()}else drawBack();
+  if(side>0){drawFace();if(isLid)ctx.drawImage(lcdZoom,-29,-112,58,73)}else drawBack();
   ctx.restore();
   if(!isLid){keypadMatrix=side>0?ctx.getTransform():null;plane(12,1);drawHinge()}
  }
@@ -169,7 +215,7 @@ function draw(){
  body(!upperInFront);body(upperInFront);
  ctx.resetTransform();output.value=Math.round(yaw)+'°';slider.value=Math.round(yaw);
  fold.value=Math.round(opening);document.querySelector('#foldValue').value=Math.round(opening)+'°';
- const status=opening<12?'閉じています':screens[screen]?.title||({home:'待受',dial:'番号入力',call:'発信デモ',note:'受信メール'})[screen];
+ const status=opening<12?(screen==='incoming'?'着信中・開いて応答':'閉じています'):screens[screen]?.title||({home:'待受',dial:'番号入力',call:'発信デモ',incoming:'着信中',talking:'通話中',note:'受信メール'})[screen];
  const live=document.querySelector('.lcd-state');if(live.textContent!==status)live.textContent=status;
  document.querySelectorAll('[data-key]').forEach(b=>b.disabled=opening<12)
 }
