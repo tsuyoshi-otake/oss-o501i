@@ -29,17 +29,12 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-html,body{margin:0}
+html,body{margin:0;height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.7}
-main{max-width:1080px;margin:0 auto;padding:28px 20px 56px;display:flex;flex-direction:column;gap:24px}
-header{display:flex;flex-direction:column;gap:4px}
-h1{font-family:var(--display);font-weight:400;font-size:28px;line-height:1.3;margin:0;text-wrap:balance}
-h2{font-family:var(--display);font-weight:400;font-size:18px;margin:0 0 8px}
-.lede{margin:0;color:var(--muted);max-width:42em}
-.work{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
-.stage{position:relative;background:var(--stage);
+/* layout: ケータイだけを画面いっぱいに出す。操作パネルは左上のボタンで右から出し入れする */
+.stage{position:fixed;inset:0;background:var(--stage);
   background-image:linear-gradient(var(--stage-grid) 1px,transparent 1px),linear-gradient(90deg,var(--stage-grid) 1px,transparent 1px);
-  background-size:24px 24px;border-radius:10px;height:820px;overflow:hidden}
+  background-size:24px 24px;overflow:hidden}
 #view{display:block;width:100%;height:100%;cursor:grab;touch-action:pan-y}
 #view.drag{cursor:grabbing}
 #view.key{cursor:pointer}
@@ -47,7 +42,15 @@ h2{font-family:var(--display);font-weight:400;font-size:18px;margin:0 0 8px}
 .badge{position:absolute;left:12px;bottom:10px;font-family:var(--display);font-size:13px;color:var(--ink);
   background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:1px 8px}
 .focus{position:absolute;right:12px;top:12px;width:210px}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.toggle{position:fixed;left:12px;top:12px;z-index:6;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;
+  background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer}
+.toggle[aria-expanded=true]{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.toggle:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.panel{position:fixed;right:12px;top:60px;bottom:12px;z-index:5;width:min(320px,calc(100vw - 24px));overflow-y:auto;overscroll-behavior:contain;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px;
+  box-shadow:0 12px 32px rgba(0,0,0,.22);transition:transform .22s ease,opacity .22s ease,visibility 0s}
+.panel:not(.open){transform:translateX(calc(100% + 24px));opacity:0;visibility:hidden;transition:transform .22s ease,opacity .22s ease,visibility 0s .22s}
+@media (prefers-reduced-motion: reduce){.panel,.panel:not(.open){transition:none}}
 fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0}
 legend,.lab{padding:0;font-size:12px;color:var(--muted);font-weight:500;letter-spacing:.04em}
 .seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
@@ -72,30 +75,16 @@ button{font:inherit;color:inherit}
 .kp .call{border-color:#3fae5a;color:#2b8a45;font-weight:700}
 .kp .end{border-color:#d9534f;color:#c0392b;font-weight:700}
 .kp .gap{grid-column:1/-1;height:2px}
-.sheet{overflow-x:auto;background:var(--stage);border-radius:8px;padding:12px}
-#sheet{display:block;image-rendering:pixelated;height:98px}
-.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
-.notes p{margin:0;color:var(--muted);font-size:14px}
-.notes strong{display:block;color:var(--ink);font-weight:700;margin-bottom:2px}
-footer{font-size:13px;color:var(--muted)}
+.credits{font-size:12px;line-height:1.6;color:var(--muted);margin:0;border-top:1px solid var(--line);padding-top:12px}
 a{color:var(--accent)}
 @media (max-width:800px){
-  .work{grid-template-columns:1fr}
-  .stage{height:560px}
   .focus{width:180px}
-  .notes{grid-template-columns:1fr;gap:12px}
-  h1{font-size:23px}
 }
 </style>
 </head>
 <body>
 <main>
-  <header>
-    <h1>折りたたみケータイ スプライトスタッキング</h1>
-    <p class="lede">1999年ごろの折りたたみケータイをイメージした架空の端末「OSS O501i」を、輪切りの絵を重ねて立体にしました。本体のボタンを押すと液晶のメニューが動きます。ドラッグで回せます。</p>
-  </header>
-
-  <section class="work">
+    <h1 class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">OSS O501i 折りたたみケータイ スプライトスタッキング</h1>
     <div class="stage">
       <canvas id="view" tabindex="0" aria-label="折りたたみケータイの積層スプライト。左右にドラッグで回転。本体のボタンをクリック、またはキーボードで操作"></canvas>
       <div class="seg three focus" role="group" aria-label="表示する範囲">
@@ -106,7 +95,8 @@ a{color:var(--accent)}
       <span class="badge" id="badge">準備中</span>
     </div>
 
-    <div class="panel">
+    <button type="button" class="toggle" id="toggle" aria-expanded="false" aria-controls="panel">☰ 操作パネル</button>
+    <div class="panel" id="panel" role="region" aria-label="操作パネル" inert>
       <fieldset>
         <legend>キー（本体のボタンも直接押せます）</legend>
         <div class="kp" id="kp">
@@ -141,9 +131,9 @@ a{color:var(--accent)}
       <fieldset>
         <legend>動き</legend>
         <div class="seg three">
-          <label><input type="radio" name="motion" value="sway" checked>ゆらゆら</label>
+          <label><input type="radio" name="motion" value="sway">ゆらゆら</label>
           <label><input type="radio" name="motion" value="spin">一周</label>
-          <label><input type="radio" name="motion" value="stop">止める</label>
+          <label><input type="radio" name="motion" value="stop" checked>止める</label>
         </div>
       </fieldset>
       <div>
@@ -155,22 +145,9 @@ a{color:var(--accent)}
         <input type="range" id="spread" min="1" max="2.6" step="0.05" value="1">
       </div>
       <label class="check"><input type="checkbox" id="outline" checked>輪郭線をつける</label>
+      <p class="credits">ドラッグで回せます。キャンバスをクリックしたあとはキーボードも使えます：矢印、Enter（決定）、M（メニュー）、Backspace（クリア）、E（メール）、B（電話帳）、S（消音）、C（発信）、Esc（終了）、数字、＊、＃。</p>
+      <p class="credits">端末「OSS O501i」と充電台、液晶の中身はすべてこのページ用に作った架空のもので、実在の機種や事業者とは関係ありません。着信メロディはクラシックの旋律を単音で打ち込みました。液晶のメニューやキーのかなは M+ BITMAP FONTS（12ドット／10ドット）です。<a href="https://github.com/tsuyoshi-otake/oss-o501i">GitHub（MIT License）</a></p>
     </div>
-  </section>
-
-  <section>
-    <h2 id="sheet-title">層シート</h2>
-    <div class="sheet"><canvas id="sheet" width="100" height="98"></canvas></div>
-    <p class="hint" style="margin-top:8px">左が充電台の底、右がアンテナの先。全部の層から32枚おきに抜き出しています。</p>
-  </section>
-
-  <section class="notes">
-    <p><strong>重ね方</strong>キー側は32°、画面側は12°うしろに傾いています。層ごとに置く位置を少しずつ後ろへずらし、層の間隔を斜面の1ドットに合わせたので、1枚の層がそのまま画面やキーの横1行になります。</p>
-    <p><strong>液晶</strong>116×148ドットの画面を1行ずつ、対応する層の前のふちに貼っています。メニューが変わっても描き直すのは液晶の絵だけで、層は作り直しません。</p>
-    <p><strong>操作</strong>キャンバスをクリックしたあとはキーボードも使えます。矢印、Enter（決定）、M（メニュー）、Backspace（クリア）、E（メール）、B（電話帳）、S（消音）、C（発信）、Esc（終了）、数字、＊、＃。</p>
-  </section>
-
-  <footer>端末「OSS O501i」と充電台、液晶の中身はすべてこのページ用に作った架空のもので、実在の機種や事業者とは関係ありません。着信メロディはクラシックの旋律を単音で打ち込みました。液晶のメニューやキーのかなは M+ BITMAP FONTS（12ドット／10ドット）で、時刻の数字はそれを2倍にしてならしたものです。待受の機種名と日付、下の帯の半角カナ、キーの数字と小さな字は、このページ用に打ったドットです。</footer>
 </main>
 
 <script>
@@ -649,12 +626,15 @@ function repaintKey(id) {
   if (K) repaintLower(K.cu - K.hu - 1, K.cu + K.hu + 1, K.cx - K.hx - 1, K.cx + K.hx + 1);
 }
 function setLed(on) { if (on !== ledOn) { ledOn = on; repaintUpper(316, 324, PX - 5, PX + 5); } }
-function drawSheet() {
-  const sh = document.getElementById('sheet'), every = 32, n = Math.ceil(NL / every);
+function drawSheet() {   // 層シートを置いたページでだけ描く
+  const sh = document.getElementById('sheet');
+  if (!sh) return;
+  const every = 32, n = Math.ceil(NL / every);
   sh.width = n * 228; sh.height = 98;
   const g = sh.getContext('2d');
   for (let i = 0; i < n; i++) { const L = layers[Math.min(NL - 1, i * every)]; g.drawImage(L.c, i * 228 + 22 + L.ox, (98 - L.h) >> 1); }
-  document.getElementById('sheet-title').textContent = '層シート（' + NL + '枚から抜粋）';
+  const tt = document.getElementById('sheet-title');
+  if (tt) tt.textContent = '層シート（' + NL + '枚から抜粋）';
 }
 
 // ====================================================================
@@ -1208,7 +1188,7 @@ const badge = document.getElementById('badge');
 const $ = id => document.getElementById(id);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const FOCUS = { all: [1, PY + 10, ZT / 2 - 4], lcd: [2.6, -LCU * S2, CZ + LCU * C2], keys: [2.1, 162 * S1, CZ - 162 * C1] };
-const st = { ang: 0.25, base: 0.25, elev: 30, mode: 'aa', motion: reduce ? 'stop' : 'sway', outline: true, spread: 1, focus: 'all', zoom: 1, fy: FOCUS.all[1], fz: FOCUS.all[2] };
+const st = { ang: 0.25, base: 0.25, elev: 30, mode: 'aa', motion: 'stop', outline: true, spread: 1, focus: 'all', zoom: 1, fy: FOCUS.all[1], fz: FOCUS.all[2] };
 let dirty = true, vw = null, lowQ = false, slow = 0, drew = false;
 const off = mk(1, 1), octx = off.getContext('2d');
 const sil = mk(1, 1), sctx = sil.getContext('2d');
@@ -1338,6 +1318,14 @@ $('spread').addEventListener('input', ev => { st.spread = +ev.target.value; $('s
 $('outline').addEventListener('change', ev => { st.outline = ev.target.checked; dirty = true; });
 $('sound').addEventListener('change', ev => { setSound(ev.target.checked); paint(); });
 $('ring').addEventListener('click', () => { audio(); ring(); });
+const panelEl = $('panel'), toggleEl = $('toggle');
+function setPanel(open) {
+  panelEl.classList.toggle('open', open); panelEl.inert = !open;
+  toggleEl.setAttribute('aria-expanded', String(open));
+  toggleEl.textContent = open ? '✕ 閉じる' : '☰ 操作パネル';
+}
+toggleEl.addEventListener('click', () => setPanel(!panelEl.classList.contains('open')));
+panelEl.addEventListener('keydown', ev => { if (ev.key === 'Escape') { setPanel(false); toggleEl.focus(); } });
 $('kp').addEventListener('click', ev => { const b = ev.target.closest('button[data-k]'); if (b) press(b.dataset.k); });
 
 let drag = null;
