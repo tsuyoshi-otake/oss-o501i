@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>折りたたみケータイ スプライトスタッキング</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* layout: 左に回転ステージ、右に操作盤（表示設定＋キー）。下に層シートと短い解説。 */
+:root{
+  --bg:#eef1f2; --panel:#ffffff; --ink:#1c2328; --muted:#5d6a72; --line:#d3dade;
+  --accent:#0b7a8c; --stage:#c5d0d4; --stage-grid:rgba(28,35,40,.07);
+  --display:"DotGothic16","Zen Kaku Gothic New",sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14191c; --panel:#1c2327; --ink:#e6ecee; --muted:#93a2aa; --line:#2e393f;
+    --accent:#4fc3d6; --stage:#2b363c; --stage-grid:rgba(230,236,238,.06);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14191c; --panel:#1c2327; --ink:#e6ecee; --muted:#93a2aa; --line:#2e393f;
+  --accent:#4fc3d6; --stage:#2b363c; --stage-grid:rgba(230,236,238,.06);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.7}
+main{max-width:1080px;margin:0 auto;padding:28px 20px 56px;display:flex;flex-direction:column;gap:24px}
+header{display:flex;flex-direction:column;gap:4px}
+h1{font-family:var(--display);font-weight:400;font-size:28px;line-height:1.3;margin:0;text-wrap:balance}
+h2{font-family:var(--display);font-weight:400;font-size:18px;margin:0 0 8px}
+.lede{margin:0;color:var(--muted);max-width:42em}
+.work{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+.stage{position:relative;background:var(--stage);
+  background-image:linear-gradient(var(--stage-grid) 1px,transparent 1px),linear-gradient(90deg,var(--stage-grid) 1px,transparent 1px);
+  background-size:24px 24px;border-radius:10px;height:820px;overflow:hidden}
+#view{display:block;width:100%;height:100%;cursor:grab;touch-action:pan-y}
+#view.drag{cursor:grabbing}
+#view.key{cursor:pointer}
+#view:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+.badge{position:absolute;left:12px;bottom:10px;font-family:var(--display);font-size:13px;color:var(--ink);
+  background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:1px 8px}
+.focus{position:absolute;right:12px;top:12px;width:210px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px}
+fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+legend,.lab{padding:0;font-size:12px;color:var(--muted);font-weight:500;letter-spacing:.04em}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+.seg label{position:relative;text-align:center;padding:6px 4px;cursor:pointer;font-size:13px;box-shadow:0 0 0 .5px var(--line)}
+.seg input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.seg label:has(input:checked){background:var(--accent);color:var(--panel);font-weight:700}
+.seg label:has(input:focus-visible){outline:2px solid var(--ink);outline-offset:-3px}
+.seg.three{grid-template-columns:repeat(3,1fr)}
+.check{display:flex;align-items:center;gap:8px;cursor:pointer}
+.check input{width:17px;height:17px;accent-color:var(--accent);margin:0}
+.checks{display:flex;flex-wrap:wrap;gap:6px 18px}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+.row{display:flex;justify-content:space-between;align-items:baseline}
+.row output{font-variant-numeric:tabular-nums;font-size:13px}
+.hint{font-size:13px;color:var(--muted);margin:0}
+button{font:inherit;color:inherit}
+.btn{border:1px solid var(--accent);background:var(--accent);color:var(--panel);font-weight:700;border-radius:6px;padding:8px 10px;cursor:pointer}
+.btn:focus-visible,.kp button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.kp{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.kp button{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:5px 2px;cursor:pointer;font-size:13px;min-height:34px}
+.kp button:active{background:var(--accent);color:var(--panel)}
+.kp .call{border-color:#3fae5a;color:#2b8a45;font-weight:700}
+.kp .end{border-color:#d9534f;color:#c0392b;font-weight:700}
+.kp .gap{grid-column:1/-1;height:2px}
+.sheet{overflow-x:auto;background:var(--stage);border-radius:8px;padding:12px}
+#sheet{display:block;image-rendering:pixelated;height:98px}
+.notes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.notes p{margin:0;color:var(--muted);font-size:14px}
+.notes strong{display:block;color:var(--ink);font-weight:700;margin-bottom:2px}
+footer{font-size:13px;color:var(--muted)}
+a{color:var(--accent)}
+@media (max-width:800px){
+  .work{grid-template-columns:1fr}
+  .stage{height:560px}
+  .focus{width:180px}
+  .notes{grid-template-columns:1fr;gap:12px}
+  h1{font-size:23px}
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>折りたたみケータイ スプライトスタッキング</h1>
+    <p class="lede">1999年ごろの折りたたみケータイをイメージした架空の端末「OSS O501i」を、輪切りの絵を重ねて立体にしました。本体のボタンを押すと液晶のメニューが動きます。ドラッグで回せます。</p>
+  </header>
+
+  <section class="work">
+    <div class="stage">
+      <canvas id="view" tabindex="0" aria-label="折りたたみケータイの積層スプライト。左右にドラッグで回転。本体のボタンをクリック、またはキーボードで操作"></canvas>
+      <div class="seg three focus" role="group" aria-label="表示する範囲">
+        <label><input type="radio" name="focus" value="all" checked>全体</label>
+        <label><input type="radio" name="focus" value="lcd">画面</label>
+        <label><input type="radio" name="focus" value="keys">キー</label>
+      </div>
+      <span class="badge" id="badge">準備中</span>
+    </div>
+
+    <div class="panel">
+      <fieldset>
+        <legend>キー（本体のボタンも直接押せます）</legend>
+        <div class="kp" id="kp">
+          <button type="button" data-k="SL">メニュー</button><button type="button" data-k="U" aria-label="上">▲</button><button type="button" data-k="SR">クリア</button>
+          <button type="button" data-k="L" aria-label="左">◀</button><button type="button" data-k="OK">決定</button><button type="button" data-k="R" aria-label="右">▶</button>
+          <button type="button" data-k="MAIL">メール</button><button type="button" data-k="D" aria-label="下">▼</button><button type="button" data-k="BOOK">電話帳</button>
+          <button type="button" data-k="CALL" class="call">発信</button><button type="button" data-k="MUTE">消音</button><button type="button" data-k="END" class="end">終了</button>
+          <span class="gap"></span>
+          <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+          <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+          <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+          <button type="button" data-k="*">＊</button><button type="button" data-k="0">0</button><button type="button" data-k="#">＃</button>
+        </div>
+        <button type="button" class="btn" id="ring">着信させる</button>
+        <label class="check"><input type="checkbox" id="sound" checked>音を鳴らす</label>
+      </fieldset>
+      <fieldset>
+        <legend>描画</legend>
+        <div class="seg">
+          <label><input type="radio" name="mode" value="aa" checked>アンチエイリアス</label>
+          <label><input type="radio" name="mode" value="nn">最近傍</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>本体カラー</legend>
+        <div class="seg three">
+          <label><input type="radio" name="way" value="silver" checked>シルバー</label>
+          <label><input type="radio" name="way" value="sakura">サクラ</label>
+          <label><input type="radio" name="way" value="graphite">グラファイト</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>動き</legend>
+        <div class="seg three">
+          <label><input type="radio" name="motion" value="sway" checked>ゆらゆら</label>
+          <label><input type="radio" name="motion" value="spin">一周</label>
+          <label><input type="radio" name="motion" value="stop">止める</label>
+        </div>
+      </fieldset>
+      <div>
+        <div class="row"><label class="lab" for="elev">カメラの高さ</label><output id="elev-out" for="elev">30°</output></div>
+        <input type="range" id="elev" min="15" max="90" step="1" value="30">
+      </div>
+      <div>
+        <div class="row"><label class="lab" for="spread">層のすきま</label><output id="spread-out" for="spread">なし</output></div>
+        <input type="range" id="spread" min="1" max="2.6" step="0.05" value="1">
+      </div>
+      <label class="check"><input type="checkbox" id="outline" checked>輪郭線をつける</label>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="sheet-title">層シート</h2>
+    <div class="sheet"><canvas id="sheet" width="100" height="98"></canvas></div>
+    <p class="hint" style="margin-top:8px">左が充電台の底、右がアンテナの先。全部の層から32枚おきに抜き出しています。</p>
+  </section>
+
+  <section class="notes">
+    <p><strong>重ね方</strong>キー側は32°、画面側は12°うしろに傾いています。層ごとに置く位置を少しずつ後ろへずらし、層の間隔を斜面の1ドットに合わせたので、1枚の層がそのまま画面やキーの横1行になります。</p>
+    <p><strong>液晶</strong>116×148ドットの画面を1行ずつ、対応する層の前のふちに貼っています。メニューが変わっても描き直すのは液晶の絵だけで、層は作り直しません。</p>
+    <p><strong>操作</strong>キャンバスをクリックしたあとはキーボードも使えます。矢印、Enter（決定）、M（メニュー）、Backspace（クリア）、E（メール）、B（電話帳）、S（消音）、C（発信）、Esc（終了）、数字、＊、＃。</p>
+  </section>
+
+  <footer>端末「OSS O501i」と充電台、液晶の中身はすべてこのページ用に作った架空のもので、実在の機種や事業者とは関係ありません。着信メロディはクラシックの旋律を単音で打ち込みました。液晶のメニューやキーのかなは M+ BITMAP FONTS（12ドット／10ドット）で、時刻の数字はそれを2倍にしてならしたものです。待受の機種名と日付、下の帯の半角カナ、キーの数字と小さな字は、このページ用に打ったドットです。</footer>
+</main>
+
+<script>
+(() => {
+'use strict';
+// ====================================================================
+// ビットマップフォント（M+ BITMAP FONTS から必要な字だけ埋め込み）
+// ====================================================================
+const FONT12 = Object.assign({"h":13,"d":{" ":"600000000000000000000000000","!":"600002020202020200000200000","\"":"600505050500000000000000000","#":"600005050f8505050f850500000","$":"600002078a0a0702828f0200000","%":"6000040a0481020409028100000","&":"600006090906048a89090680000","'":"600202020200000000000000000","(":"600102020404040404020201000",")":"600402020101010101020204000","*":"600000020a8702070a820000000","+":"6000000002020f8202000000000",",":"600000000000000002070204000","-":"6000000000000f8000000000000",".":"600000000000000002070200000","/":"600000808101020204040808000","0":"6000070888898a8c88888700000","1":"600002060a02020202020200000","2":"600007088880810204080f80000","3":"60000f808102070080888700000","4":"60000303050509090f810100000","5":"60000f88080f008088888700000","6":"60000304080f088888888700000","7":"60000f808101020204040400000","8":"600007088885020508888700000","9":"600007088888888780810600000",":":"600000000207020002070200000",";":"600000000207020002070204000","<":"600000810204080402010080000","=":"60000000000f800f80000000000",">":"600008040201008102040800000","?":"600007088880810202000200000","@":"600007088b8a8a8a8b880700000","A":"600002020505050f88888880000","B":"60000f0888888f0888888f00000","C":"600007088808080808088700000","D":"60000e090888888888890e00000","E":"60000f8808080f0808080f80000","F":"60000f8808080f0808080800000","G":"6000070888080b8888888780000","H":"6000088888888f8888888880000","I":"600007020202020202020700000","J":"600000808080808888888700000","K":"600008890a0c0c0a09088880000","L":"600008080808080808080f80000","M":"6000088d8a88888888888880000","N":"6000088c8a89888888888880000","O":"600007088888888888888700000","P":"60000f0888888f0808080800000","Q":"60000708888888888888870100c","R":"60000f0888888f0a09088880000","S":"600007088808070080888700000","T":"60000f820202020202020200000","U":"600008888888888888888700000","V":"600008888888850505020200000","W":"60000a8a8a8a8a8a85050500000","X":"600008888505020505088880000","Y":"600008888505020202020200000","Z":"60000f808101020404080f80000","[":"600704040404040404040407000","\\":"600008080404020201010080800","]":"600701010101010101010107000","^":"600205088000000000000000000","_":"60000000000000000000000f800","`":"600404020200000000000000000","a":"600000000007008788888780000","b":"60000808080f088888888f00000","c":"600000000007088808088700000","d":"600000808087888888888780000","e":"600000000007088f88088700000","f":"6000018202020f8202020200000","g":"600000000007888888878088870","h":"60000808080b0c8888888880000","i":"600200000006020202020700000","j":"6001000000030101010101010e0","k":"6000080808090a0c0a090880000","l":"600006020202020202020300000","m":"60000000000f0a8a8a8a8a80000","n":"60000000000b0c8888888880000","o":"600000000007088888888700000","p":"60000000000f0888888f0808080","q":"600000000007888888878080808","r":"60000000000b0c8808080800000","s":"600000000007088700888700000","t":"60000404040f040404048300000","u":"600000000008888888898680000","v":"600000000008888505020200000","w":"60000000000a8a8a8a850500000","x":"600000000008850202050880000","y":"600000000008888888878088870","z":"60000000000f810204080f80000","{":"6001820202020c0202020201800","|":"600202020202020202020202000","}":"600c0202020201820202020c000","~":"6000068b0000000000000000000","°":"c000300480480300000000000000000000000000","×":"c0000000002081100a00400a0110208000000000","÷":"c0000000400e00400007fc0000400e0040000000","←":"c000000080100200400ffe400200100080000000","→":"c000000020010008004ffe004008010020000000","▲":"c0000000400e00e01f01f03f83f87fc7fc000000","▼":"c0000007fc7fc3f83f81f01f00e00e0040000000","♪":"c0000400600500480480500401c03c0380000000","、":"c000000000000000000000000000000400200000","。":"c000000000000000000000000300480480300000","「":"c03c020020020020020020020000000000000000","」":"c000000000000000080080080080080080080780","あ":"c00004004c7f00800f81942924a24c2344018000","い":"c000000000200208404404402422240180000000","う":"c0001c00300000e0310008008008010060180000","お":"c00008008c7e20800800f8184282482484318000","か":"c0001001081087c41241222222204204201c0000","が":"c0001041121087c01241242222224204201c0000","き":"c0000400587e003c7e00101e82182001000f0000","く":"c0000000100200400801001000c0020010008000","ぐ":"c000000020044092108200200180040020010000","け":"c0000082082084fe408408408408408210260000","こ":"c0000001f80000000000001002002041f8000000","さ":"c00002002002c7f00100101e82182001000f0000","し":"c000000080080080100100100104104088070000","じ":"c0000001081241102002002002082081100e0000","す":"c000020020ffe0200e01201200e0020040180000","ず":"c000020020ffe0200e41221280e4020040180000","せ":"c00000810810813e7c81081081381001000fc000","そ":"c0000001f80100200407fe040080080080078000","ぞ":"c0000003e4032048080ffc0801001001000f0000","た":"c0001001007f810013c10022024024043e400000","だ":"c0041121087f010013c10022024024043e400000","ち":"c00004004005e7e00801701880040040080f0000","っ":"c0000000000000000000e03100080080100e0000","つ":"c0000000000f07080040040040080301c0000000","て":"c0000000000fcf20040080080080080040038000","で":"c0000000000fcf20044092088080080040038000","と":"c0000800800800400780c01002002001000f8000","な":"c00008008cfe210010820820847848c08a070000","に":"c00000020023c40040040042044044023e200000","ね":"c00010010010073814418210231a52612411a000","の":"c0000000000f8144242442482482304018000000","は":"c0000082082084fe40840840847848c28a270000","ば":"c0000144124189f48108108108f09185144e0000","ぱ":"c00000c4124129fc8108108108f09185144e0000","び":"c00000479208810020820c40a4104102201c0000","ふ":"c0000001f00100200402442442224224220c0000","へ":"c000000000000000380440820018006000000000","ほ":"c0000002fe2084084fe40840847848c28a270000","ま":"c0000200207fc0203fc0200201e02382241c0000","み":"c0000007c00480480483f848c88a908610060000","め":"c0000200202202f81243225424c2482304018000","も":"c0000800807f80800807f8100104104088070000","ゃ":"c0000000000000201201703a8088090040040000","や":"c00001011011c17219268204c040040020020000","よ":"c0000400400400780400400403c0470448380000","ら":"c0000c00300002002002703880040040180e0000","り":"c000000108108108108108148088008010060000","る":"c0000001f80100200701882040c41241280f0000","れ":"c000100100100738144184104308508108106000","ろ":"c0000001f80100200701882040040040180e0000","わ":"c000100100100738144182102302502104118000","を":"c0000800807f81001c022c4704a01201000f8000","ん":"c00000004004008008016019021021241240c000","ア":"c0000007fe002004048040040040040080300000","イ":"c0000000040080100601a0620020020020020000","エ":"c0000000007fc040040040040040040ffe000000","ォ":"c0000000000000200203f80200600a0320060000","オ":"c0000100100107fe010030050190610010070000","カ":"c0000400400407fe04204204208208210261c000","キ":"c0000400400407fc0400400407fe020020020000","ク":"c00004004007c084104204008008010060380000","グ":"c0040920880f81082084080100100200c0700000","ケ":"c0001001001001fe2104100100200200c0300000","コ":"c0000000007fc0040040040040040047fc004000","シ":"c0000003000c0002602184004008010060380000","ジ":"c0040123080c0002602184004008010060380000","ス":"c0000003f8008008008010010030048184602000","ゼ":"c00409208808e0b21c4e8408808008008007e000","タ":"c00004004007c084104264018008010060380000","ダ":"c0040920880f81082084c80300100200c0700000","チ":"c00000003c7c0040040ffe040040040080300000","ッ":"c000000000000000248248248010010060180000","テ":"c0000003fc0000007fe020020020020040180000","ト":"c0001001001001001c013010c100100100100000","ド":"c000208224210200380260218200200200200000","ナ":"c0000200200207fe020020020040040080300000","ニ":"c0000000003fc0000000000000000007fe000000","ヌ":"c0000003fc0040040880480300100280c4700000","ネ":"c0000400407f80080100200601d8e46040040000","ノ":"c0000000080080080080080100100200c0300000","バ":"c000004012108100100108208204204402402000","ヒ":"c00020020020021c3e02002002002002001fc000","ビ":"c00000421220820021c3e02002002002001fc000","フ":"c0000007fc004004004004008008010060380000","プ":"c00c012ff200c0080080080100100200c0300000","ホ":"c000040040040ffe0400402484448420400c0000","マ":"c0000000007fe0020040081100a0040020010000","メ":"c0000100100100103100e0038026040180600000","ヤ":"c00010010011c1e4e84088088080040040040000","ュ":"c0000000000000003e00200200200207f8000000","ラ":"c0000003f80000007fc004004008010060180000","リ":"c0002082082082082082080080100100200c0000","ル":"c000020120120120120122122224224428430000","レ":"c000000200200200200200204208210260380000","ワ":"c0000007fc404404404004008008010060180000","ン":"c0000003000c0002002004004008010060380000","・":"c0000000000000000000c00c0000000000000000","ー":"c0000000000000004003fc000000000000000000","一":"c000000000000000000ffe000000000000000000","上":"c04004004004007c040040040040040040ffe000","中":"c040040040ffe842842842ffe040040040040000","了":"c000ffc0080100200400400400400400401c0000","予":"c0007f8010020040ffe0440480400400401c0000","交":"c040040ffe1102084041100a00400a0318c06000","以":"c000204244244224224204208388c14062182000","位":"c0102102105fe400c444444444444484085fe000","体":"c0102102105fe410c304584945124fc410410000","信":"c00027e2004fe400c7e40040047e44244247e000","倍":"c0101101fe224224efe20020027e24224227e000","側":"c0001e232a5ead2a5ea52a52a5ea402522616000","傍":"c0102103fe448448dfe5224fe44047e48248c000","傾":"c00027e20853e522d7e5a253e5225be4244c2000","充":"c040040ffe0800901087fc122120120222c1e000","入":"c0003c00400400400400a00a0110210408806000","内":"c040040040ffe8428428a2912a0a80280280e000","処":"c4004007bc4a44a48a492454424660098087e000","出":"c0400404444444447fc040040842842842ffe000","切":"c0004fe422422f22422422442442382084018000","列":"c000fc22122123d2452652952092082302c06000","前":"c108110ffe0007d24527d24527d24524424c6000","力":"c080080080ffe082082082082102102204c38000","卓":"c04004007c0403f82083f82083f8040ffe040000","単":"c0844482107fc4447fc4444447fc040ffe040000","取":"c000fc04be7824a24a2794494488798ca40c2000","受":"c0007f4084448210ffe802bfa0081100e071c000","台":"c100108208204ffc0020023f82082082083f8000","右":"c040040ffe0400400801fc304d041041041fc000","向":"c020040080ffe8028029f29129129f280280e000","周":"c0007fe4424425f24425fa4025f25129f2806000","回":"c000ffe8028029f29129129129f2802802ffe000","囲":"c000ffe802892bfa892892bfa912912802ffe000","土":"c0400400400407fc040040040040040040ffe000","埋":"c0004fe4924fee924924fe4104fe410e100fe000","報":"c20023efa2220ffe4a24aafea224f8421a262000","場":"c0004fc4844fce844fe4405fe44a492f2204c000","塗":"c00047c28287c4101fe4508940423f8040ffe000","大":"c040040040ffe0400400400a00a0110208c06000","天":"c000ffe0400400407fc0400400a0110208c06000","奥":"c0400807fc5544447fc444554ffe0a0318c06000","字":"c040040ffe802bf2010020040ffe0400401c0000","定":"c040040ffe8028003fc04004027c2403c0c3e000","小":"c0000400400404444444428428420400401c0000","少":"c0400400402482444428400c40080300c0700000","層":"c0007fe4027fe5125fe5125fe4848fc8840fc000","左":"c080080ffe1001001001fe2102104104101fe000","帯":"c040248ffe2483f8000ffe842bfa248258040000","帳":"c00027e24027cfc0a7ca40afea5024a244272000","平":"c000ffe040444248040040ffe040040040040000","度":"c0200207fe4887fe4884f84009fc8880f070e000","引":"c000f84084084f84804804f84084084104604000","形":"c000fe2484488480fe2484488480482884888000","影":"c000fc2844fc8840fc2104fe8480782944b28000","待":"c01021047e8100102fe404cfe40444442440c000","後":"c0002284488900542244fec404fc5444385c6000","必":"c0001800600001045145229429821083084f0000","応":"c0200207fe400420410400444442540a4283e000","情":"c0102102fe210a7ea10afea42a7e24227e242000","戻":"c000ffe0007fc4047fc4207fe820850188606000","所":"c000f860380207a04be4a47a4424444844804000","手":"c00003c7c00400407fc040040ffe0400401c0000","抜":"c0404405fee4044047c4846a4d14508434cc2000","択":"c00047e442f4244247e448648c44444482c82000","押":"c0004fe492e924fe492492692cfe410410c10000","持":"c0104104fee104104fe4046fec04444424c0c000","描":"c0244244fee244244fe492692cfe492492cfe000","数":"c210a5069efe4224684a54f94488c88314ce2000","斜":"c0003044a4814f04244224f0621cae4a04204000","日":"c0003fc2042042042043fc2042042042043fc000","明":"c00007ef4294297ef4294297ef4204208230e000","映":"c010010efea92a92a92e92bfea10a28e44182000","時":"c010010f7e9109109fef049fe904944f2400c000","晶":"c0003f82083f82083f8000fbe8a2fbe8a2fbe000","曲":"c0900900907fe4924924927fe4924924927fe000","最":"c0003f82083f8208ffe4807fe4a44a4798ce6000","月":"c0003fc2042043fc2042043fc20420440441c000","木":"c040040040ffe0400e0150248444842040040000","末":"c040040ffe0400407fc0400d0148244c42040000","本":"c040040040ffe0400e01502484449f2040040000","枚":"c22022023efa4244244614714a88a082342c2000","横":"c0482482fee483fe2926fe692afea00244282000","機":"c010252294f5a2942fe6106fea48a6a28429a000","気":"c2002003fe4005f80007fc0043240c4122612000","水":"c040040044f481501602502484448420401c0000","決":"c0100108fe4120128124fe010010228444982000","沿":"c00003c80444404288248007e04224244287e000","波":"c0100108fe4920908fc4840a45145088348c2000","消":"c0100108924540108fe4820fe0822fe482886000","液":"c010010bfe49009c924524354554508918966000","深":"c0001fe92a5280489864101fe430454992810000","減":"c00800a9fe5081f890a57a154574504a1aa62000","火":"c0400400402442444484480a00a0110208c06000","灯":"c00027e204a84a84a8420420450448480481c000","点":"c04004007c0400403f82082083f8000524892000","理":"c0000fee924fe492492efe4104fe410e100fe000","画":"c000ffe0403f8248a4abfaa4aa4abfa802ffe000","発":"c0007a40a88925143f85269207fc120222c3e000","直":"c020020ffe0200fc4844fc4844844fc4007fe000","着":"c108110ffe0407fc040ffe1083f8d081081f8000","矩":"c00087efc0a4027efc224227e5404c084087e000","示":"c0007fc000000000ffe0400402484448420c0000","秒":"c010190e10254292e10210630702a04a182e0000","移":"c010190e3e2c2224f1826063e6c2a24a182e0000","種":"c0001fee102fe292ffe2926fe610afea102fe000","積":"c010190efe2102fee103fe64467ca44a7c386000","空":"c040040ffe8a28a212063c0003f8040040ffe000","立":"c040040040ffe000108108108110110010ffe000","端":"c010492492ffe200afea10afeaaa2aafaa086000","答":"c0204207bea480001f02085f48023f82083f8000","範":"c4204207be948fdea52fd2a52fd6210fd221e000","粋":"c020220afca24224f462506107fea10a10210000","終":"c02022043e842ea4218466f1020cac0a3020e000","絵":"c00023c442900f7e200400f7e210b22a4227e000","続":"c0102104fe810e7e2004fef82228a28a4a38e000","縦":"c04422448897ee08248488fae2a8aa8ab82c6000","縮":"c0102105fe902f7e2484befa22beaa2aa22be000","置":"c0007fe4927fe020ffe0884f84884f84007fe000","背":"c120126f38120122ffe2043fc2043fc20420c000","色":"c0001f0210420ffc4444447fc4004024023fe000","落":"c110110ffe11047c2848484780861fc4848fc000","行":"c00027c4008000002fe408c08408408408438000","表":"c040040ffe0407fc040ffe0a0322d141087c6000","要":"c000ffe0a07fc4a44a47fc080ffe1081f060c000","解":"c00077e912222fccaa8fbeaa8ac8fbe888988000","設":"c000e78048e4804ae8e0000fce44a48a38ec6000","話":"c000f06078f08008f7e008008f7e942942f7e000","貼":"c010f10910f1e910f1091097ef4204254297e000","距":"c000fbe8a08a0fbe222222bbea20a20a20fbe000","身":"c0400803f82083f820a3fc208ff8088308c38000","軸":"c008208f8823efaaaaafaaabefaa22afaa23e000","輪":"c000238f44282ffea80ffeaaafaa2fefaa2aa000","込":"c0000f0410210010028e282442822005008fe000","近":"c00000c47024004007ee482882882085008fe000","透":"c0000fe8105fe054092ef822e22224c5008fe000","通":"c0000fc4082fe0920fee922fe2922965008fe000","連":"c0100104fe2100fe092efe2922fe2105008fe000","進":"c04804887e4c817e048e7e24824827e5008fe000","遷":"c0000fe4282fe0aa0fee4a2b832223e5008fe000","選":"c0001ee4222ee0880fee282fe2282c65008fe000","郭":"c10011eff20127d44587d4092112ff211c710000","重":"c0007fc040ffe2483f82483f80403fc040ffe000","金":"c0000e01102085f48420407fc040444248ffe000","間":"c000fbe8a2fbe8a2fbe8029f29129f29129f6000","隔":"c000efea00a7cc44a7ca00afeaaacc68ba892000","離":"c110114fd42be924abefe4124ffea24ba487e000","電":"c0007fc040ffe9527fc4447fc4447fc04207e000","面":"c000ffe040080ffe9129f29129f2912912ffe000","音":"c0400407fc110110ffe0003f82083f82083f8000","高":"c040040ffe1101f0000ffe8029f29129f2806000","（":"c004008010010020020020020020010010008004","）":"c400200100100080080080080080100100200400","：":"c0000000000000c00c00000000c00c0000000000"}}, { c: new Map() });
+const FONT10 = Object.assign({"h":13,"d":{" ":"600000000000000000000000000","!":"600002020202020002000000000","\"":"600505050000000000000000000","#":"600005050f850f8505000000000","$":"600002078a0702828f020000000","%":"60000c0c8102040981800000000","&":"600006090906098906800000000","'":"600202020000000000000000000","(":"600102020404040202010000000",")":"600402020101010202040000000","*":"6000020a8702070a82000000000","+":"60000002020f820200000000000",",":"600000000000000002040000000","-":"60000000000f800000000000000",".":"600000000000000002000000000","/":"600001010202040408080000000","0":"60000708898a8c8887000000000","1":"600002060a02020202000000000","2":"60000708808304080f800000000","3":"60000f810207008887000000000","4":"6000030509090f8101000000000","5":"60000f880f00808887000000000","6":"600007080f08888887000000000","7":"60000f808102020404000000000","8":"600007088887088887000000000","9":"600007088888878087000000000",":":"600000000200000200000000000",";":"600000000200000204000000000","<":"600000810204020100800000000","=":"600000000f800f8000000000000",">":"600008040201020408000000000","?":"600007088081020002000000000","@":"600007088b8a8b8807000000000","A":"6000020205050f8888800000000","B":"60000f08888f08888f000000000","C":"600007088808080807800000000","D":"60000f08888888888f000000000","E":"60000f88080f08080f800000000","F":"60000f88080f080808000000000","G":"60000708880b888887800000000","H":"60000888888f888888800000000","I":"600007020202020207000000000","J":"600000808080888887000000000","K":"600008890a0c0a0908800000000","L":"60000808080808080f800000000","M":"6000088d8a88888888800000000","N":"6000088c8a89888888800000000","O":"600007088888888887000000000","P":"60000f0888888f0808000000000","Q":"6000070888888888870100c0000","R":"60000f08888f088888800000000","S":"600007088807008887000000000","T":"60000f820202020202000000000","U":"600008888888888887000000000","V":"600008888885050202000000000","W":"60000a8a8a8a8a8505000000000","X":"600008850202020508800000000","Y":"600008888885020202000000000","Z":"60000f80810204080f800000000","[":"600382020202020202038000000","\\":"600008080404020201010000000","]":"600e020202020202020e0000000","^":"600205088000000000000000000","_":"6000000000000000000f8000000","`":"600404020200000000000000000","a":"600000000700878887800000000","b":"600008080f0888888f000000000","c":"600000000708880807800000000","d":"600000808788888887800000000","e":"6000000007088f8807800000000","f":"60000182020f820202000000000","g":"600000000788888887808700000","h":"600008080b0c888888800000000","i":"600200000602020207000000000","j":"600200000602020202020c00000","k":"6000080808890a0908800000000","l":"600006020202020203000000000","m":"600000000f0a8a8a8a800000000","n":"600000000b0c888888800000000","o":"600000000708888887000000000","p":"600000000f0888888f080800000","q":"600000000788888887808080000","r":"600000000b0c880808000000000","s":"60000000078807008f000000000","t":"600002020f82020201800000000","u":"600000000888888986800000000","v":"600000000888850502000000000","w":"600000000a8a8a8505000000000","x":"600000000885020508800000000","y":"600000000888888887808700000","z":"600000000f8102040f800000000","{":"60018202020c020202018000000","|":"600202020202020202020000000","}":"600c020202018202020c0000000","~":"6000068b0000000000000000000","あ":"a100100ff81003e0650a88a88710060000000000","か":"a100100110f90248248248440440180000000000","さ":"a040040058fe00201d02302001000e0000000000","た":"a100100fe0100178200220240440438000000000","な":"a100110fc82004204208e09301280c0000000000","は":"a0204204209f88208208e09305284c0000000000","ま":"a040040ff80407f00403c0460450380000000000","や":"a0402402402f0f28108130080080080000000000","ら":"a0003000c00004005e06100100203c0000000000","わ":"a200200260e90308208608a08210260000000000"}}, { c: new Map() });
+function glyph(font, ch) {
+  let g = font.c.get(ch);
+  if (g === undefined) {
+    const s = font.d[ch];
+    if (!s) g = null;
+    else {
+      const hd = (s.length - 1) / font.h, r = new Uint16Array(font.h);
+      for (let i = 0; i < font.h; i++) r[i] = parseInt(s.substr(1 + i * hd, hd), 16);
+      g = { w: parseInt(s[0], 36), n: hd * 4, r };
+    }
+    font.c.set(ch, g);
+  }
+  return g;
+}
+function label(font, str) {
+  const gs = [...str].map(ch => glyph(font, ch)), xs = [];
+  let w = 0;
+  for (const g of gs) { xs.push(w); w += g ? g.w : 6; }
+  return {
+    w, h: font.h,
+    bit(c, r) {
+      if (r < 0 || r >= font.h || c < 0 || c >= w) return 0;
+      let i = gs.length - 1;
+      while (xs[i] > c) i--;
+      const g = gs[i];
+      return g ? (g.r[r] >> (g.n - 1 - (c - xs[i]))) & 1 : 0;
+    },
+  };
+}
+function art(rows) {
+  return { w: rows[0].length, h: rows.length, rows, bit(c, r) { return r >= 0 && r < rows.length && rows[r][c] === 'X' ? 1 : 0; } };
+}
+
+// ---------- 字と絵の道具 ----------
+const G = s => art(s.split('/'));
+// 2倍に拡大しながら斜めの段をなめらかにつなぐ（EPX）。5×7 や 5×9 の小さな字を、太さ2ドットの字に起こす
+function scale2x(a) {
+  const rows = [];
+  for (let r = 0; r < a.h; r++) {
+    let t = '', b = '';
+    for (let c = 0; c < a.w; c++) {
+      const P = a.bit(c, r), A = a.bit(c, r - 1), B = a.bit(c + 1, r), C = a.bit(c - 1, r), D = a.bit(c, r + 1);
+      t += (C === A && C !== D && A !== B ? A : P) ? 'X' : '.'; t += (A === B && A !== C && B !== D ? B : P) ? 'X' : '.';
+      b += (D === C && D !== B && C !== A ? C : P) ? 'X' : '.'; b += (B === D && B !== A && D !== C ? D : P) ? 'X' : '.';
+    }
+    rows.push(t, b);
+  }
+  return art(rows);
+}
+function grow(base) { const o = {}; for (const k in base) o[k] = scale2x(G(base[k])); return o; }
+// 日付とキーの数字（5×7 → 10×14）
+const D14 = grow({
+  0: '.XXX./X...X/X...X/X...X/X...X/X...X/.XXX.', 1: '.X./XX./.X./.X./.X./.X./XXX', 2: '.XXX./X...X/....X/...X./..X../.X.../XXXXX',
+  3: '.XXX./X...X/....X/..XX./....X/X...X/.XXX.', 4: '...X./..XX./.X.X./X..X./XXXXX/...X./...X.', 5: 'XXXXX/X..../XXXX./....X/....X/X...X/.XXX.',
+  6: '..XX./.X.../X..../XXXX./X...X/X...X/.XXX.', 7: 'XXXXX/....X/...X./..X../..X../.X.../.X...', 8: '.XXX./X...X/X...X/.XXX./X...X/X...X/.XXX.',
+  9: '.XXX./X...X/X...X/.XXXX/....X/...X./.XX..', '/': '...X/...X/..X./..X./.X../X.../X...', '(': '.X/X./X./X./X./X./.X', ')': 'X./.X/.X/.X/.X/.X/X.',
+  '*': '..X../X.X.X/.XXX./..X../.XXX./X.X.X/..X..', '#': '.X.X./.X.X./XXXXX/.X.X./XXXXX/.X.X./.X.X.',
+});
+// 機種名の太字（6×7 → 12×14）。i だけ斜体
+const N14 = grow({
+  O: '.XXXX./XX..XX/XX..XX/XX..XX/XX..XX/XX..XX/.XXXX.', S: '.XXXX./XX..XX/XX..../.XXXX./....XX/XX..XX/.XXXX.',
+  5: 'XXXXX/XX.../XXXX./...XX/...XX/XX.XX/.XXX.', 0: '.XXX./XX.XX/XX.XX/XX.XX/XX.XX/XX.XX/.XXX.', 1: '.XX/XXX/.XX/.XX/.XX/.XX/.XX',
+  i: '.XX/.../.XX/.XX/.XX/XX./XX.',
+});
+// キーの右下に小さく入る英字（3×5）
+const TINY = {
+  A: '.X./X.X/XXX/X.X/X.X', B: 'XX./X.X/XX./X.X/XX.', C: '.XX/X../X../X../.XX', D: 'XX./X.X/X.X/X.X/XX.', E: 'XXX/X../XX./X../XXX', F: 'XXX/X../XX./X../X..',
+  G: '.XX/X../X.X/X.X/.XX', H: 'X.X/X.X/XXX/X.X/X.X', I: 'XXX/.X./.X./.X./XXX', J: '..X/..X/..X/X.X/.X.', K: 'X.X/X.X/XX./X.X/X.X', L: 'X../X../X../X../XXX',
+  M: 'X.X/XXX/XXX/X.X/X.X', N: 'XX./X.X/X.X/X.X/X.X', O: '.X./X.X/X.X/X.X/.X.', P: 'XX./X.X/XX./X../X..', Q: '.X./X.X/X.X/XXX/.XX', R: 'XX./X.X/XX./X.X/X.X',
+  S: '.XX/X../.X./..X/XX.', T: 'XXX/.X./.X./.X./.X.', U: 'X.X/X.X/X.X/X.X/XXX', V: 'X.X/X.X/X.X/X.X/.X.', W: 'X.X/X.X/XXX/XXX/X.X', X: 'X.X/X.X/.X./X.X/X.X',
+  Y: 'X.X/X.X/.X./.X./.X.', Z: 'XXX/..X/.X./X../XXX',
+};
+function tiny(s) { return art(join(...[...s].map(c => TINY[c].split('/')))); }
+
+// ====================================================================
+// 形（単位はドット。x:左右 / y:奥→手前 / z:高さ。ヒンジ軸は y=0, z=CZ）
+// 寸法は端末の写真から、写真の1画素を2ドットとして取った。液晶の1ドットが立体の1ドットと同じ大きさになる。
+// キー側は A1、画面側は A2 だけ後ろに傾いている。u は斜面に沿った距離、w は面からの深さ。
+// ====================================================================
+const W = 184, PX = 92, PY = 56;
+const A1 = 32 * Math.PI / 180, A2 = 12 * Math.PI / 180;
+const S1 = Math.sin(A1), C1 = Math.cos(A1), S2 = Math.sin(A2), C2 = Math.cos(A2);
+const L1 = 340, L2 = 329, TH1 = 38, TH2 = 28, KEYH = 2;
+const K1 = Math.round((10 + L1 * C1 + TH1 * S1) / C1);   // キー側と充電台の層数（層の間隔 C1）
+const K2 = L2 + 66;                                      // 画面側とアンテナの層数（層の間隔 C2）
+const CZ = K1 * C1, ZT = CZ + K2 * C2, NL = K1 + K2;
+const CR_TOP = 46, CRK = Math.ceil(CR_TOP / C1);
+const LW = 116, LH = 148, LX0 = 34, LU0 = 80;            // 液晶の大きさと位置（写真の液晶は 58×74 画素）
+const LCU = LU0 + LH / 2;                                // 液晶の中心（斜面に沿った位置）
+const HR2 = 441, HY = 6;                                 // ヒンジの筒：半径21、軸より6だけ奥
+const CRY = Math.round(L1 * S1) - 19;                    // 充電台の中心（奥行き方向）
+
+function rr(dx, dy, hx, hy, r) {
+  const qx = Math.abs(dx) - (hx - r), qy = Math.abs(dy) - (hy - r);
+  if (qx <= 0 || qy <= 0) return qx <= r && qy <= r;
+  return qx * qx + qy * qy <= r * r;
+}
+// 外形：面を正面から見たときの半幅。先端は半楕円で閉じ、ヒンジ寄りはわずかに細い
+function hwLower(u) {
+  if (u > L1 - 42) { const t = (u - (L1 - 42)) / 42; return t >= 1 ? 0 : 90 * Math.sqrt(1 - t * t); }
+  if (u > 264) return 92 - (u - 264) / 17;
+  if (u > 70) return 92;
+  return u > 50 ? 90 + (u - 50) / 10 : 90;
+}
+function hwUpper(u) {
+  if (u > L2 - 48) { const t = (u - (L2 - 48)) / 48; return t >= 1 ? 0 : 88 * Math.sqrt(1 - t * t); }
+  if (u > 161) return 91 - (u - 161) / 40;
+  return u < 26 ? 89.5 : 91;
+}
+function lowerBody(x, u, w) {
+  const ax = Math.abs(x - PX), h = hwLower(u);
+  if (ax > h) return false;
+  if (u < 20 && !rr(ax, u - 74, h, 60, 6)) return false;
+  if (!rr(ax, w + TH1 / 2, h, TH1 / 2, w < -TH1 / 2 ? 11 : 3.5)) return false;
+  if (w < -TH1 + 16) { const d = 16 - TH1 - w, e = 16 - Math.sqrt(256 - d * d); if (ax > hwLower(u + e)) return false; }   // 先端の裏の角を丸める
+  return true;
+}
+function upperBody(x, u, w) {
+  const ax = Math.abs(x - PX), h = hwUpper(u);
+  if (ax > h) return false;
+  if (u < 22 && !rr(ax, u - 86, h, 70, 6)) return false;
+  if (!rr(ax, w + TH2 / 2, h, TH2 / 2, w < -TH2 / 2 ? 9 : 3.5)) return false;
+  if (w < -TH2 + 12) { const d = 12 - TH2 - w, e = 12 - Math.sqrt(144 - d * d); if (ax > hwUpper(u + e)) return false; }
+  return true;
+}
+// 面のうち、ふちの帯を除いた内側
+function faceIn(p, ax, u) {
+  return p === 2 ? ax < hwLower(u) - 3 && ax < hwLower(u + 3) : ax < hwUpper(u) - 3 && ax < hwUpper(u + 3);
+}
+// 正面から見て右肩に立つアンテナ。金属の根元は内側へ広がり、溝のある輪をはさんで、淡い色の太い先端がのる
+const ANTX = 157, ANT_RING = L2 + 14, ANT_TIP = L2 + 24, ANT_TOP = L2 + 64;
+function antenna(x, u, w) {
+  if (u > ANT_TOP) return false;
+  let rx = 14, cx = ANTX, k = 1;
+  if (u < ANT_RING) { rx = Math.min(22, 16.5 + (ANT_RING - u) * 0.21); cx = 174 - rx; }
+  else if (u < ANT_TIP) rx = 14.6;
+  else if (u > ANT_TOP - 12) { const t = (u - (ANT_TOP - 12)) / 12; k = 1 - t * t; }
+  const a = (x - cx) / rx, b = (w + 15) / 14;
+  return a * a + b * b < k;
+}
+function cradleTop(y) { return y > CRY + 20 ? 24 : y < CRY - 13 ? CR_TOP : CR_TOP - (y - (CRY - 13)) / 33 * (CR_TOP - 24); }
+function cradle(x, y, z) {
+  const top = cradleTop(y);
+  if (z >= top) return false;
+  const sh = z > top - 3 ? z - (top - 3) : 0;
+  return rr(x - PX, y - CRY, PX + 18 - sh, 46 - sh, 18);
+}
+
+// ---------- キー ----------
+// 3列×8段。上4段の機能キーは段ごとに左右の位置と形が違い、中央の ▲・決定・▼ はひとつの縦長の楕円を3つに割った形
+const ROWU = [58, 87.5, 118.5, 148.5, 178.5, 208, 237.5, 266.5];
+const CLU = ROWU[1];
+const KEYS = [
+  ['SL', 'menu', -59.5, 0, 16.5, 11, 'ell'], ['U', 'up', 0, 0, 24, 22, 'cap'], ['SR', 'clear', 59.5, 0, 16.5, 11, 'ell'],
+  ['L', 'left', -48, 1, 19, 12.5, 'box'], ['OK', 'ok', 0, 1, 22, 15.5, 'ell'], ['R', 'right', 48, 1, 19, 12.5, 'box'],
+  ['MAIL', 'mail', -53, 2, 16.5, 10.5, 'ell'], ['D', 'down', 0, 2, 24, 22, 'cap'], ['BOOK', 'book', 53, 2, 16.5, 10.5, 'ell'],
+  ['CALL', 'call', -52, 3, 20.5, 11.5, 'ell'], ['MUTE', 'mute', 0, 3, 19, 11.5, 'ell'], ['END', 'end', 52, 3, 20.5, 11.5, 'ell'],
+].map(([id, t, dx, row, hx, hu, sh]) => ({ id, t, cx: PX + dx, cu: ROWU[row], hx, hu, sh, r: 7.5, dir: row ? 1 : -1 }));
+const ALPHA = ['', 'ABC', 'DEF', 'GHI', 'JKL', 'MNO', 'PQRS', 'TUV', 'WXYZ', '', '', ''];
+[...'123456789*0#'].forEach((ch, i) => {
+  const kana = 'あかさたなはまやら わ '[i];
+  KEYS.push({ id: ch, t: 'num', cx: PX + (i % 3 - 1) * 48, cu: ROWU[4 + (i / 3 | 0)], hx: 18, hu: 10.5, r: 9, sh: 'box',
+    kl: kana === ' ' ? null : label(FONT10, kana), al: ALPHA[i] ? tiny(ALPHA[i]) : null });
+});
+function sup(a, b) { a = Math.abs(a); b = Math.abs(b); return Math.pow(a, 2.6) + Math.pow(b, 2.6); }
+// g だけ外へ広げた（負なら内へ縮めた）キーの形
+function mask(K, x, u, g) {
+  g = g || 0;
+  const dx = x - K.cx, du = u - K.cu;
+  if (Math.abs(dx) > K.hx + g || Math.abs(du) > K.hu + g) return false;
+  if (K.sh === 'ell') return sup(dx / (K.hx + g), du / (K.hu + g)) <= 1;
+  if (K.sh === 'cap') {
+    const dv = (u - CLU) * K.dir;
+    if (dv <= 0) return false;
+    const a = dx / (22.5 + g), b = dv / (43.5 + g), c = dx / (25.5 - g), d = dv / (19 - g);
+    return Math.abs(a * a * a) + b * b * b <= 1 && c * c + d * d > 1;
+  }
+  return rr(dx, du, K.hx + g, K.hu + g, K.r + g);
+}
+function keyAt(x, u) {
+  if (u < 40 || u > 280) return 0;
+  for (let i = 0; i < KEYS.length; i++) if (mask(KEYS[i], x, u)) return i + 1;
+  return 0;
+}
+function nearKey(x, u) {   // キーのまわりの明るいふち
+  if (u < 36 || u > 284) return false;
+  for (let i = 0; i < KEYS.length; i++) if (mask(KEYS[i], x, u, 3.2)) return true;
+  return false;
+}
+function join(...gs) { return gs[0].map((_, r) => gs.map(g => g[r]).join('.')); }
+const KANA5 = {
+  'メ': ['....X', '....X', 'X..X.', '.XX..', '..XX.', '.X..X', 'X....'],
+  'ニ': ['.....', '.XXX.', '.....', '.....', '.....', 'XXXXX', '.....'],
+  'ュ': ['.....', '.....', '.XXX.', '...X.', '...X.', 'XXXXX', '.....'],
+  'ー': ['.....', '.....', '.....', 'XXXXX', '.....', '.....', '.....'],
+  'ク': ['..XXX', '.X..X', 'X...X', '...X.', '...X.', '..X..', '.X...'],
+  'リ': ['X...X', 'X...X', 'X...X', 'X...X', '....X', '...X.', '.XX..'],
+  'ア': ['XXXXX', '....X', '..X.X', '..XX.', '..X..', '..X..', '.X...'],
+};
+const ICON_END = scale2x(art(['..XXXXXXX..', '.XXXXXXXXX.', 'XXXX...XXXX', 'XXX.....XXX', 'XXX.....XXX']));
+const TRI_L = art(['....X', '...XX', '..XXX', '.XXXX', 'XXXXX', '.XXXX', '..XXX', '...XX', '....X']);
+const TRI_R = art(['X....', 'XX...', 'XXX..', 'XXXX.', 'XXXXX', 'XXXX.', 'XXX..', 'XX...', 'X....']);
+const SUB_DOWN = art(['XXXXXXX', '.X...X.', '..X.X..', '...X...']), SUB_BOX = art(['XXXXXX', 'X....X', 'X....X', 'X....X', 'X....X', 'XXXXXX']);
+const NOTE8 = art(['...XX...', '...XXX..', '...X.XX.', '...X..XX', '...X...X', '...X....', '...X....', '...X....', '.XXX....', 'XXXX....', 'XXXX....', '.XX.....']);
+const KEYART = {
+  menu: art(join(...[...'メニュー'].map(c => KANA5[c]))),
+  clear: art(join(...[...'クリア'].map(c => KANA5[c]))),
+  up: art(['....X....', '...XXX...', '..XXXXX..', '.XXXXXXX.', 'XXXXXXXXX']),
+  down: art(['XXXXXXXXX', '.XXXXXXX.', '..XXXXX..', '...XXX...', '....X....']),
+  ok: art(['.XXXXXXX.', 'XXXXXXXXX', 'XXXXXXXXX', '.XXXXXXX.']),
+  mail: art(['XXXXXXXXXXXXX', 'XX.........XX', 'X.XX.....XX.X', 'X...XX.XX...X', 'X.....X.....X', 'X...........X', 'X...........X', 'X...........X', 'XXXXXXXXXXXXX']),
+  book: art(['XXXXXX.XXXXXX', 'X....XXX....X', 'X.XX..X..XX.X', 'X.....X.....X', 'X.XX..X..XX.X', 'X.....X.....X', 'X.XX..X..XX.X', 'X.....X.....X', 'XXXXXXXXXXXXX']),
+  call: art(['XXX............', 'XXXX...........', 'XXXXX..........', '.XXXX..........', '..XXXX.........', '...XXXX........', '....XXXXX...XX.', '.....XXXXXXXXXX', '......XXXXXXXXX', '........XXXXXXX', '..........XXXX.']),
+  end: ICON_END,
+};
+const BACKMARK = label(FONT10, 'O501i');
+
+// ---------- 色 ----------
+// panel は液晶まわりの一段暗い面。シルバーは写真の色を拾った（キーは面より少し暗く、決定キーだけ明るい）
+const WAYS = {
+  silver: { body: [190, 189, 187], dark: [124, 122, 120], key: [164, 160, 159], ok: [206, 202, 202], ink: [96, 98, 98], metal: [180, 177, 175], cradle: [62, 66, 74], panel: [176, 168, 158] },
+  sakura: { body: [238, 194, 206], dark: [196, 142, 160], key: [252, 248, 244], ok: [255, 255, 255], ink: [142, 84, 102], metal: [236, 222, 226], cradle: [96, 70, 80], panel: [252, 190, 208] },
+  graphite: { body: [78, 84, 96], dark: [50, 54, 64], key: [218, 222, 228], ok: [240, 242, 246], ink: [170, 178, 192], metal: [150, 156, 166], cradle: [36, 38, 44], panel: [66, 72, 84] },
+};
+const UPPER = 0.87;   // 画面側の面は少し暗く見える
+let PAL = WAYS.silver, pressed = null, ledOn = false;
+const GLASS = [20, 24, 30], FRAME = [44, 50, 48], HOLE = [28, 30, 36], HILITE = [255, 214, 92];
+const ANT_TIPC = [188, 190, 173], GREEN = [34, 150, 104], RED = [206, 70, 56];
+const out = [0, 0, 0];
+function set(c, f) { f = f || 1; out[0] = c[0] * f; out[1] = c[1] * f; out[2] = c[2] * f; }
+function mix(c, d, t) { out[0] = c[0] + (d[0] - c[0]) * t; out[1] = c[1] + (d[1] - c[1]) * t; out[2] = c[2] + (d[2] - c[2]) * t; }
+const WHITE = [255, 255, 255], KEYINK = [26, 30, 38], KANA = [70, 74, 84];
+
+function keyColor(K, x, u) {
+  const dx = x - K.cx, du = u - K.cu, col = Math.floor(dx), row = Math.floor(du);
+  const base = pressed === K.id ? HILITE : K.t === 'ok' ? PAL.ok : PAL.key;
+  let ink = null;
+  if (K.t === 'num') {
+    const d = D14[K.id];
+    if (d.bit(col + 15 - ((10 - d.w) >> 1), row + 7)) ink = KEYINK;
+    else if (K.kl && K.kl.bit(col - 2, row + 8)) ink = KANA;
+    else if (K.al && K.al.bit(col - (K.al.w > 12 ? 0 : 2), row - 3)) ink = KANA;
+  } else if (K.t === 'left') {
+    if (TRI_L.bit(col + 12, row + 4)) ink = KEYINK; else if (SUB_DOWN.bit(col - 3, row + 2)) ink = KANA;
+  } else if (K.t === 'right') {
+    if (TRI_R.bit(col - 7, row + 4)) ink = KEYINK; else if (SUB_BOX.bit(col + 10, row + 3)) ink = KANA;
+  } else if (K.t === 'mute') {
+    if (NOTE8.bit(col + 4, row + 6) || (Math.abs(dx + du) < 1.3 && Math.abs(du) < 8)) ink = KEYINK;   // 音符に斜線
+  } else {
+    const a = KEYART[K.t], oy = K.id === 'U' ? 2 : 0;   // ▲ は形の中心が少し上にある
+    if (a.bit(col + (a.w >> 1), row + (a.h >> 1) + oy)) ink = K.t === 'call' ? GREEN : K.t === 'end' ? RED : KEYINK;
+  }
+  if (ink) { set(ink); return; }
+  if (!mask(K, x, u, -1.4)) mix(base, PAL.dark, 0.75);             // キーの輪郭
+  else if (!mask(K, x, u + 2.4, -1.4)) set(base, 0.84);
+  else if (!mask(K, x, u - 2.4, -1.4)) mix(base, WHITE, 0.5);
+  else set(base);
+}
+function lowerRow(L) {
+  const uf = L.uf, fr = L.fr, h = hwLower(uf);
+  for (let xi = 0; xi < W; xi++) {
+    const x = xi + 0.5, dx = x - PX, ax = Math.abs(dx), ki = keyAt(x, uf);
+    if (ki) keyColor(KEYS[ki - 1], x, uf);
+    else if (rr(dx, uf - 310, 6, 2, 2)) set(HOLE);                                                  // 送話口
+    else if (ax < 33 && Math.abs(uf - (304 - dx * dx / 128)) < 1.3) mix(PAL.body, WHITE, 0.75);       // 送話口の上の弧
+    else if (nearKey(x, uf)) mix(PAL.body, WHITE, 0.6);
+    else if ((ax - 67.5) * (ax - 67.5) + (uf - 301) * (uf - 301) < 9) mix(PAL.body, WHITE, 0.6);      // 先端の左右の小さな突起
+    else if (rr(dx - 74, uf - 132, 2.6, 2.6, 1)) set(PAL.dark);                                       // 右わきの小窓
+    else if (h - ax < 5) mix(PAL.body, WHITE, 0.4);                                                   // 面のふちの面取り
+    else set(PAL.body);
+    fr[xi * 3] = out[0]; fr[xi * 3 + 1] = out[1]; fr[xi * 3 + 2] = out[2];
+  }
+}
+// 液晶まわりの一段暗い面。上辺はゆるい弧、ヒンジ側は大きな丸底
+function panel(dx, u, g) {
+  const ax = Math.abs(dx), hx = 80 - g;
+  if (ax > hx) return false;
+  if (u > 88) { let t = 251 - g - 11 * ax * ax / 5329; const c = ax - (hx - 9); if (c > 0) t -= 9 - Math.sqrt(81 - c * c); return u < t; }
+  const a = ax / hx, b = (88 - u) / (51 - g);
+  return a * a * a + b * b * b <= 1;
+}
+// 受話口：小さな穴を 4・5・4・5・4 個、互い違いに並べる
+function earHole(dx, u) {
+  const r = Math.round((u - 278) / 6.5);
+  if (r < -2 || r > 2) return false;
+  const n = r & 1 ? 5 : 4, off = (n - 1) * 3.5, i = Math.round((dx + off) / 7);
+  if (i < 0 || i >= n) return false;
+  const ex = dx + off - i * 7, eu = u - 278 - r * 6.5;
+  return ex * ex + eu * eu < 3.2;
+}
+function upperRow(L) {
+  const uf = L.uf, fr = L.fr, h = hwUpper(uf);
+  for (let xi = 0; xi < W; xi++) {
+    const x = xi + 0.5, dx = x - PX, ax = Math.abs(dx);
+    if (panel(dx, uf, 0)) {
+      if (rr(dx, uf - LCU, LW / 2 + 3, LH / 2 + 3, 3)) { if (rr(dx, uf - LCU, LW / 2 + 0.5, LH / 2 + 0.5, 1)) set(GLASS); else set(FRAME); }
+      else if (!panel(dx, uf, 1.8)) mix(PAL.panel, WHITE, 0.55);
+      else set(PAL.panel, UPPER);
+    } else if (earHole(dx, uf)) set(HOLE);
+    else if (rr(dx, uf - 320, 3, 2.5, 2.5)) set(ledOn ? [255, 96, 72] : [112, 54, 54]);                  // 着信ランプ
+    else if ((ax - 67) * (ax - 67) + (uf - 287) * (uf - 287) < 14 || (ax - 68) * (ax - 68) + (uf - 45) * (uf - 45) < 7) mix(PAL.body, WHITE, 0.45);   // 閉じたときに当たる突起
+    else if (h - ax < 5) mix(PAL.body, WHITE, 0.25);
+    else set(PAL.body, UPPER);
+    fr[xi * 3] = out[0]; fr[xi * 3 + 1] = out[1]; fr[xi * 3 + 2] = out[2];
+  }
+}
+
+// ---------- 立体の中身 ----------
+let U = 0, WD = 0;
+// 0:空 1:充電台 2:キー側 3:画面側 4:ヒンジ 5:アンテナ 6:キーの出っぱり
+function kind(x, y, z) {
+  const dz = z - CZ, by = y + HY;
+  if (dz < 0) {
+    const u = y * S1 - dz * C1, w = y * C1 + dz * S1;
+    U = u; WD = w;
+    if (w <= 0) { if (w >= -TH1 && u >= 14 && u <= L1 && lowerBody(x, u, w)) return 2; }
+    else if (w <= KEYH && x > 0 && x < W && keyAt(x, -dz / C1)) return 6;
+    if (by * by + dz * dz < HR2 && x > 4 && x < W - 4) return 4;
+    if (z < CR_TOP && cradle(x, y, z)) return 1;
+    return 0;
+  }
+  const u = -y * S2 + dz * C2, w = y * C2 + dz * S2;
+  U = u; WD = w;
+  if (w <= 0 && w >= -TH2 && u >= 16 && u <= L2 && upperBody(x, u, w)) return 3;
+  if (by * by + dz * dz < HR2 && x > 4 && x < W - 4) return 4;
+  if (u > L2 - 60 && antenna(x, u, w)) return 5;
+  return 0;
+}
+function shadeAt(x, y, z) {
+  if (!kind(x, y, z + 1.05)) return 1;
+  // ふちから3.5ドット以内を「側面」として塗る。層を間引かずに1回ずつ描いても、のぞく帯が側面の色でそろう
+  const nx = (kind(x + 3.5, y, z) ? 0 : 1) - (kind(x - 3.5, y, z) ? 0 : 1);
+  const ny = (kind(x, y + 3.5, z) ? 0 : 1) - (kind(x, y - 3.5, z) ? 0 : 1);
+  if (!nx && !ny) return 0.9;
+  const l = Math.hypot(nx, ny);
+  return (0.8 + 0.13 * (nx * 0.4 + ny * 0.9165) / l) * (0.9 + 0.1 * z / ZT);
+}
+function backArt(p, x, z, w) {
+  const dx = x - PX;
+  if (p === 3) {
+    if (w < -TH2 + 6) {
+      const u = (z - CZ + TH2 * S2) / C2;   // この層が背面と交わる位置
+      const row = Math.floor(u);
+      if (row >= L2 - 88 && row < L2 - 62 && BACKMARK.bit(Math.floor((PX + BACKMARK.w - x) / 2), (L2 - 63 - row) >> 1)) return set(PAL.ink);
+      if (Math.abs(dx) < 17 && u > L2 - 130 && u < L2 - 104 && (Math.floor(u) % 6) < 2) return set(HOLE);
+    }
+    return set(PAL.body);
+  }
+  if (w < -TH1 + 6) {
+    const u = (CZ - z - TH1 * S1) / C1;
+    if (rr(dx, u - 186, 74, 118, 14) && !rr(dx, u - 186, 72.4, 116.4, 12.4)) return set(PAL.dark, 0.9);   // 電池ぶたの合わせ目
+    if (rr(dx, u - 86, 17, 5, 3.5)) return set(PAL.dark);
+    if (u > L1 - 34 && u < L1 - 24 && (Math.abs(dx - 14) < 5 || Math.abs(dx + 14) < 5)) return set([206, 176, 92]);
+  }
+  return set(PAL.body);
+}
+// 1点の色を out に入れる。空なら 0。
+function texel(x, y, L) {
+  const z = L.z, p = kind(x, y, z);
+  if (!p) return 0;
+  const u = U, w = WD;
+  if (p === 2 || p === 3) {
+    const TH = p === 2 ? TH1 : TH2, hw = p === 2 ? hwLower : hwUpper, ax = Math.abs(x - PX);
+    if (w > -6.5 && u > 6.5 && faceIn(p, ax, u)) {             // 斜面の帯：その層の横1行をそのまま奥へ押し出す
+      const q = (x | 0) * 3, f = L.fr;
+      out[0] = f[q]; out[1] = f[q + 1]; out[2] = f[q + 2];
+      return 1;
+    }
+    if (w < -8 && w > -TH + 8 && u > 24 && ax < hw(u + 10) - 10) { set(PAL.body, 0.9); return 1; }   // 外から見えない芯
+    backArt(p, x, z, w);
+    if (u > 30 && ax < hw(u + 18) - 20) {                     // 平らな背面：shadeAt と同じ答えを、まわりを調べずに出す
+      const s = w - 3.5 * (p === 2 ? C1 : C2) < -TH ? 0.6809 * (0.9 + 0.1 * z / ZT) : 0.9;
+      out[0] *= s; out[1] *= s; out[2] *= s;
+      return 1;
+    }
+  } else if (p === 6) {
+    const q = (x | 0) * 3, f = L.fr;
+    out[0] = f[q]; out[1] = f[q + 1]; out[2] = f[q + 2];
+    return 1;
+  } else if (p === 4) {
+    // 5つの節に分かれた金属の筒。節は互い違いに画面側・キー側のもので、相手側との境目に影が落ちる
+    const dz = z - CZ, seg = x < 32 ? 0 : x < 50 ? 1 : x < 92 ? 2 : x < 150 ? 3 : 4, by = y + HY;
+    if (by * by + dz * dz < 256 && x > 10 && x < W - 10) { set(PAL.dark, 0.9); return 1; }   // 筒の芯は見えない
+    if (Math.abs(x - 32) < 1.2 || Math.abs(x - 50) < 1.2 || Math.abs(x - 92) < 1.2 || Math.abs(x - 150) < 1.2) set(PAL.dark, 0.45);
+    else if (seg & 1 ? dz < -11.5 && dz > -14 : dz > 18.5) set(PAL.dark, 0.5);
+    else {
+      const t = 0.5 + ((y + HY) * 0.42 + dz * 0.9) / 42;
+      mix(PAL.dark, PAL.metal, t < 0 ? 0 : t > 1 ? 1 : t * 1.25 > 1 ? 1 : t * 1.25);
+      if (t > 0.7 && t < 0.86) { out[0] += (255 - out[0]) * 0.8; out[1] += (255 - out[1]) * 0.8; out[2] += (255 - out[2]) * 0.8; }
+    }
+  } else if (p === 5) {
+    if (u >= ANT_TIP) set(ANT_TIPC); else if (u >= ANT_RING) set((Math.floor(u) & 3) < 2 ? PAL.metal : PAL.dark); else set(PAL.metal, 1.05);
+  } else {
+    if (y > CRY + 44.5 && Math.abs(x - PX) < 5 && z > 10 && z < 15) { set([255, 84, 60]); return 1; }
+    set(PAL.cradle);
+    if (z + 1.1 < cradleTop(y) - 6 && rr(x - PX, y - CRY, PX + 10, 38, 12)) { out[0] *= 0.9; out[1] *= 0.9; out[2] *= 0.9; return 1; }   // 充電台の内側
+  }
+  const s = shadeAt(x, y, z);
+  out[0] *= s; out[1] *= s; out[2] *= s;
+  return 1;
+}
+
+// ---------- 層 ----------
+function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+// 層の絵は、その高さで中身がある奥行きの範囲だけを持つ。fy は斜面の位置、back は斜面から裏までの奥行き。
+// L.face が斜面のくる行で、ヒンジの筒がかかる層だけ前後に広げる
+function trim(L, fy, back) {
+  const dz = Math.abs(L.z - CZ);
+  let b = back + 2, f = 4;
+  if (dz < 21) { const c = Math.sqrt(HR2 - dz * dz) + 1; b = Math.max(b, fy + HY + c); f = Math.max(f, c - HY - fy); }
+  L.face = Math.ceil(b); L.ox = 0; L.w = W; L.oy = fy - L.face; L.h = L.face + Math.ceil(f);
+}
+const layers = [];
+for (let k = 0; k < NL; k++) {
+  const L = { k, low: k < K1, lcdRow: -1, fr: new Uint8ClampedArray(W * 3) };
+  if (L.low) {
+    L.th = C1; L.z = (k + 0.5) * C1; L.uf = K1 - k - 0.5;
+    if (k < CRK) { L.ox = -20; L.w = W + 40; L.oy = CRY - 49; L.h = 98; L.doy = 0; L.face = 0; }
+    else { trim(L, L.uf * S1, TH1 / C1); L.doy = -S1 / C1; }
+  } else {
+    const j = k - K1;
+    L.th = C2; L.z = CZ + (j + 0.5) * C2; L.uf = j + 0.5;
+    trim(L, -L.uf * S2, 31); L.doy = -S2 / C2;   // 31 はアンテナの付け根が背面から出るぶんを含む
+    if (j >= LU0 && j < LU0 + LH) L.lcdRow = LU0 + LH - 1 - j;
+  }
+  L.c = mk(L.w, L.h); L.g = L.c.getContext('2d');
+  layers.push(L);
+}
+function paintLayer(L, i0, i1) {
+  if (L.low) lowerRow(L); else upperRow(L);
+  i0 = Math.max(0, i0 === undefined ? 0 : Math.floor(i0 - L.ox)); i1 = Math.min(L.w, i1 === undefined ? L.w : Math.ceil(i1 - L.ox));
+  if (i1 <= i0) return;
+  const img = L.g.createImageData(i1 - i0, L.h), d = img.data;
+  let q = 0;
+  for (let j = 0; j < L.h; j++) {
+    const y = L.oy + j + 0.5, lcd = L.lcdRow >= 0 && j >= L.face - 6;   // 液晶を貼る場所は透明のままにしておく
+    for (let i = i0; i < i1; i++, q += 4) {
+      if ((lcd && i >= LX0 && i < LX0 + LW) || !texel(L.ox + i + 0.5, y, L)) continue;
+      d[q] = out[0]; d[q + 1] = out[1]; d[q + 2] = out[2]; d[q + 3] = 255;
+    }
+  }
+  L.g.putImageData(img, i0, 0);
+}
+let built = 0, buildId = 0;
+function build() {
+  const id = ++buildId;
+  built = 0;
+  (function step() {
+    if (id !== buildId) return;
+    const t0 = performance.now();
+    while (built < NL && performance.now() - t0 < 28) paintLayer(layers[built++]);
+    dirty = true;
+    if (built < NL) setTimeout(step, 0); else drawSheet();
+  })();
+}
+function repaintLower(u0, u1, x0, x1) {   // 斜面の行 u0..u1、列 x0..x1 だけ描き直す
+  for (let n = Math.floor(u0); n <= Math.floor(u1); n++) { const k = K1 - 1 - n; if (k >= 0 && k < built) paintLayer(layers[k], x0, x1); }
+  dirty = true;
+}
+function repaintUpper(u0, u1, x0, x1) {
+  for (let n = Math.floor(u0); n <= Math.floor(u1); n++) { const k = K1 + n; if (k < built) paintLayer(layers[k], x0, x1); }
+  dirty = true;
+}
+function repaintKey(id) {
+  const K = KEYS.find(k => k.id === id);
+  if (K) repaintLower(K.cu - K.hu - 1, K.cu + K.hu + 1, K.cx - K.hx - 1, K.cx + K.hx + 1);
+}
+function setLed(on) { if (on !== ledOn) { ledOn = on; repaintUpper(316, 324, PX - 5, PX + 5); } }
+function drawSheet() {
+  const sh = document.getElementById('sheet'), every = 32, n = Math.ceil(NL / every);
+  sh.width = n * 228; sh.height = 98;
+  const g = sh.getContext('2d');
+  for (let i = 0; i < n; i++) { const L = layers[Math.min(NL - 1, i * every)]; g.drawImage(L.c, i * 228 + 22 + L.ox, (98 - L.h) >> 1); }
+  document.getElementById('sheet-title').textContent = '層シート（' + NL + '枚から抜粋）';
+}
+
+// ====================================================================
+// 液晶
+// ====================================================================
+const fb = new Uint8Array(LW * LH);
+const lcdC = mk(LW, LH), lcdG = lcdC.getContext('2d'), lcdImg = lcdG.createImageData(LW, LH);
+const lcd3 = mk(LW, LH * 3), lcd3G = lcd3.getContext('2d');   // 行をにじませずに1行ずつ取り出せるよう、縦3倍で持つ
+const BLS = [
+  { name: '消灯', bg: [134, 140, 136], fg: [14, 18, 16] },   // 写真の液晶の色。バックライトなしの灰緑で、これが標準
+  { name: 'グリーン', bg: [160, 216, 86], fg: [24, 50, 18] },
+  { name: 'オレンジ', bg: [246, 172, 64], fg: [66, 30, 6] },
+  { name: 'ホワイト', bg: [216, 234, 242], fg: [22, 40, 62] },
+];
+const S = { tone: 3, wall: 0, bl: 0, sound: true };
+function flush() {
+  const p = BLS[S.bl], d = lcdImg.data;
+  for (let i = 0, q = 0; i < fb.length; i++, q += 4) {
+    const c = fb[i] ? p.fg : p.bg;
+    d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = 255;
+  }
+  lcdG.putImageData(lcdImg, 0, 0);
+  lcd3G.imageSmoothingEnabled = false;
+  lcd3G.drawImage(lcdC, 0, 0, LW, LH * 3);
+  dirty = true;
+}
+function cls() { fb.fill(0); }
+let OY = 0;   // 画面の中身を下へずらす量。上の帯と下の帯のあいだで中身を中央に寄せる
+function px(x, y, v) { y += OY; if (x >= 0 && x < LW && y >= 0 && y < LH) fb[y * LW + x] = v === undefined ? 1 : v; }
+function box(x, y, w, h, v) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) px(x + i, y + j, v); }
+function frame(x, y, w, h) { box(x, y, w, 1); box(x, y + h - 1, w, 1); box(x, y, 1, h); box(x + w - 1, y, 1, h); }
+function inv(x, y, w, h) { y += OY; for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (i >= 0 && i < LW && j >= 0 && j < LH) fb[j * LW + i] ^= 1; }
+function tw(s, sc) { let w = 0; for (const ch of String(s)) { const g = glyph(FONT12, ch); w += g ? g.w : 6; } return w * (sc || 1); }
+function txt(s, x, y, sc) {
+  sc = sc || 1;
+  for (const ch of String(s)) {
+    const g = glyph(FONT12, ch);
+    if (!g) { x += 6 * sc; continue; }
+    for (let r = 0; r < 13; r++) {
+      const bits = g.r[r];
+      if (!bits) continue;
+      for (let c = 0; c < g.w; c++) if ((bits >> (g.n - 1 - c)) & 1) { if (sc === 1) px(x + c, y + r); else box(x + c * sc, y + r * sc, sc, sc); }
+    }
+    x += g.w * sc;
+  }
+  return x;
+}
+function ctxt(s, y, sc) { txt(s, (LW - tw(s, sc)) >> 1, y, sc); }
+function rtxt(s, xr, y, sc) { txt(s, xr - tw(s, sc), y, sc); }
+function spr(a, x, y, sc, flip) {
+  sc = sc || 1;
+  for (let r = 0; r < a.h; r++) for (let c = 0; c < a.w; c++) if (a.bit(flip ? a.w - 1 - c : c, r)) box(x + c * sc, y + r * sc, sc, sc);
+}
+// art の字を左から並べる。字ごとに幅がちがう
+function gtxt(font, s, x, y, gap) { for (const ch of s) { const a = font[ch]; if (a) { spr(a, x, y); x += a.w + gap; } else x += 6; } return x; }
+function gw(font, s, gap) { let w = 0; for (const ch of s) { const a = font[ch]; w += a ? a.w + gap : 6; } return w - gap; }
+// 時刻の数字：12ドットの字を2倍にして角をならしたもの（字の高さ18ドット）
+function fromGlyph(ch) {
+  const g = glyph(FONT12, ch), rows = [];
+  for (let r = 0; r < 13; r++) { let t = ''; for (let c = 0; c < g.w; c++) t += (g.r[r] >> (g.n - 1 - c)) & 1 ? 'X' : '.'; rows.push(t); }
+  return art(rows);
+}
+const T26 = {};
+for (const ch of '0123456789:') T26[ch] = scale2x(fromGlyph(ch));
+// 下の帯に出す半角カナ（7×11）。1ドットずらして重ね、太らせて使う
+const HK = {
+  'メ': G('.....X./.....X./X....X./.X..X../..X.X../...X.../...XX../..X..X./.X....X/X....../.......'),
+  'ー': G('......./......./......./......./X....../.XXXXXX/......./......./......./......./.......'),
+  'ル': G('.X..X../.X..X../.X..X../.X..X../.X..X../.X..X../.X..X.X/.X..X.X/X...XX./X...X../.......'),
+  'ニ': G('......./......./.XXXXX./......./......./......./......./......./XXXXXXX/......./.......'),
+  'ュ': G('......./......./......./......./.XXXX../....X../....X../....X../XXXXXXX/......./.......'),
+};
+function hk(s, x, y) { for (const ch of s) { spr(HK[ch], x, y); spr(HK[ch], x + 1, y); x += 8; } }
+const I_ANT = G('XXXXXXXXXXXX/XXXXXXXXXXXX/XXXXXXXXXXXX/....XXXX..../....XXXX..../....XXXX..../....XXXX..../....XXXX..../....XXXX..../....XXXX..../....XXXX..../....XXXX..../....XXXX..../....XXXX....');
+const I_ENV = G('XXXXXXXXXXXXXXXX/X..XXXXXXXXXX..X/XX..XXXXXXXX..XX/XXX..XXXXXX..XXX/XXXX..XXXX..XXXX/XXXXX..XX..XXXXX/XXXXXX....XXXXXX/XXXXX.XXXX.XXXXX/XXXX.XXXXXX.XXXX/XXX.XXXXXXXX.XXX/XX.XXXXXXXXXX.XX/XXXXXXXXXXXXXXXX');
+const I_UP = art(['..X..', '.XXX.', 'XXXXX']), I_DN = art(['XXXXX', '.XXX.', '..X..']);
+const I_CHECK = art(['......X', '.....XX', 'X...XX.', 'XX.XX..', '.XXX...', '..X....']);
+// 上の帯：T字のアンテナ、点と3本の電波、3目盛りの電池。位置と大きさは写真の待受に合わせてある
+function statusBar() {
+  spr(I_ANT, 4, 4);
+  box(18, 14, 4, 4); box(24, 10, 3, 8); box(29, 7, 3, 11); box(34, 4, 3, 14);
+  box(92, 4, 20, 2); box(92, 16, 20, 2); box(92, 4, 2, 14); box(110, 4, 2, 14); box(112, 8, 2, 6);
+  box(95, 7, 4, 8); box(100, 7, 4, 8); box(105, 7, 4, 8);
+  if (!S.sound) { txt('♪', 60, 4); for (let i = 0; i < 12; i++) box(60 + i, 16 - i, 2, 1); }   // 消音中だけ、斜線つきの音符を出す
+}
+// 下の帯は枠で囲む
+function softFrame() { box(0, 124, LW, 2); box(0, 126, 2, 20); box(LW - 2, 126, 2, 20); box(0, 146, LW, 2); }
+function soft(l, r) {
+  const o = OY; OY = 0;
+  softFrame();
+  if (l) txt(l, 5, 131);
+  if (r) rtxt(r, LW - 5, 131);
+  OY = o;
+}
+function title(t) { const o = OY; OY = 0; txt(t, 3, 20); inv(0, 20, LW, 13); OY = o; }
+
+// ====================================================================
+// 音（単音の矩形波）
+// ====================================================================
+let ac = null, seqNode = null, seqTimer = 0;
+function audio() {
+  if (!S.sound) return null;
+  if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (ac.state === 'suspended') ac.resume().catch(() => {});
+  return ac;
+}
+function beep(f, dur, f2, vol) {
+  const a = audio();
+  if (!a) return;
+  const t = a.currentTime + 0.01, g = a.createGain();
+  g.gain.setValueAtTime(vol || 0.05, t); g.gain.setValueAtTime(0, t + dur);
+  g.connect(a.destination);
+  for (const fq of f2 ? [f, f2] : [f]) {
+    const o = a.createOscillator();
+    o.type = f2 ? 'sine' : 'square'; o.frequency.value = fq; o.connect(g); o.start(t); o.stop(t + dur + 0.02);
+  }
+}
+const DTMF = { 1: [697, 1209], 2: [697, 1336], 3: [697, 1477], 4: [770, 1209], 5: [770, 1336], 6: [770, 1477], 7: [852, 1209], 8: [852, 1336], 9: [852, 1477], '*': [941, 1209], 0: [941, 1336], '#': [941, 1477] };
+const NOTE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+function seq(str, unit) {   // "E5 D#5:2 -" → [[周波数, 秒], ...]
+  return str.trim().split(/\s+/).map(tok => {
+    const [n, d] = tok.split(':'), dur = (d ? parseFloat(d) : 1) * unit;
+    if (n === '-') return [0, dur];
+    const m = /^([A-G])(#?)(\d)$/.exec(n), midi = 12 * (+m[3] + 1) + NOTE[m[1]] + (m[2] ? 1 : 0);
+    return [440 * Math.pow(2, (midi - 69) / 12), dur];
+  });
+}
+function rep(a, n) { let o = []; while (n--) o = o.concat(a); return o; }
+const TONES = [
+  { name: '着信音 1', s: rep(rep([[2093, 0.045], [2637, 0.045]], 10).concat([[0, 0.35]]), 2) },
+  { name: '着信音 2', s: rep(rep([[1976, 0.09], [0, 0.07]], 4).concat([[0, 0.5]]), 2) },
+  { name: '着信音 3', s: rep(seq('C6 E6 G6 C7 G6 E6', 0.07).concat([[0, 0.3]]), 3) },
+  { name: 'エリーゼのために', s: seq('E5 D#5 E5 D#5 E5 B4 D5 C5 A4:2 - C4 E4 A4 B4:2 - E4 G#4 B4 C5:2 - E4 E5 D#5 E5 D#5 E5 B4 D5 C5 A4:2 - C4 E4 A4 B4:2 - E4 C5 B4 A4:4', 0.17) },
+  { name: 'トルコ行進曲', s: seq('B4 A4 G#4 A4 C5:2 -:2 D5 C5 B4 C5 E5:2 -:2 F5 E5 D#5 E5 B5 A5 G#5 A5 B5 A5 G#5 A5 C6:4 A5:2 C6:2 B5:2 A5:2 G5:2 A5:2 B5:2 A5:2 G5:2 A5:2 B5:2 A5:2 G5:2 F#5:2 E5:4', 0.1) },
+  { name: 'よろこびのうた', s: seq('E5 E5 F5 G5 G5 F5 E5 D5 C5 C5 D5 E5 E5:1.5 D5:.5 D5:2 E5 E5 F5 G5 G5 F5 E5 D5 C5 C5 D5 E5 D5:1.5 C5:.5 C5:2', 0.27) },
+  { name: 'カノン', s: seq('F#5:2 E5:2 D5:2 C#5:2 B4:2 A4:2 B4:2 C#5:2 D5 F#5 A5 G5 F#5 D5 F#5 E5 D5 B4 D5 A5 G5 B5 A5 G5 F#5:4', 0.24) },
+  { name: 'メヌエット', s: seq('D5:2 G4 A4 B4 C5 D5:2 G4:2 G4:2 E5:2 C5 D5 E5 F#5 G5:2 G4:2 G4:2 C5:2 D5 C5 B4 A4 B4:2 C5 B4 A4 G4 F#4:2 G4 A4 B4 G4 A4:6', 0.2) },
+];
+function stopSeq() {
+  clearTimeout(seqTimer);
+  if (seqNode) {
+    try { seqNode.g.gain.cancelScheduledValues(0); seqNode.g.gain.setValueAtTime(0, ac.currentTime); seqNode.o.stop(ac.currentTime + 0.03); } catch (e) {}
+    seqNode = null;
+  }
+}
+function playSeq(s, loopGap) {
+  stopSeq();
+  const a = audio();
+  if (!a) return;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = 'square'; g.gain.value = 0; o.connect(g); g.connect(a.destination);
+  let t = a.currentTime + 0.04;
+  const t0 = t;
+  for (const [f, d] of s) {
+    if (f) { o.frequency.setValueAtTime(f, t); g.gain.setValueAtTime(0.045, t); g.gain.setValueAtTime(0, t + d * 0.88); }
+    t += d;
+  }
+  o.start(t0); o.stop(t + 0.05);
+  seqNode = { o, g };
+  if (loopGap !== undefined) seqTimer = setTimeout(() => playSeq(s, loopGap), (t - t0 + loopGap) * 1000);
+}
+
+// ====================================================================
+// ケータイの中身（画面遷移）
+// ====================================================================
+const stack = [];
+let toast = null, ringing = false;
+const top = () => stack[stack.length - 1];
+function paint() {
+  const s = top();
+  cls(); OY = 0; statusBar();
+  OY = s.tall ? 0 : 13; s.draw(); OY = 0;
+  if (toast) { const x = (LW - 92) >> 1; box(x, 58, 92, 32, 0); frame(x, 58, 92, 32); frame(x + 2, 60, 88, 28); ctxt(toast.msg, 68); }
+  flush();
+}
+function push(s) { stack.push(s); if (s.enter) s.enter(); paint(); }
+function pop() { if (stack.length > 1) { const s = stack.pop(); if (s.leave) s.leave(); paint(); } }
+function home() { while (stack.length > 1) { const s = stack.pop(); if (s.leave) s.leave(); } paint(); }
+function say(msg, then) { toast = { msg, t: 0.9, then }; paint(); }
+
+function List(name, items, opt) {
+  const s = {
+    i: opt.sel ? opt.sel() : 0, off: 0, tall: true,
+    draw() {
+      title(name);
+      if (s.i < s.off) s.off = s.i;
+      if (s.i > s.off + 6) s.off = s.i - 6;
+      const cur = opt.sel ? opt.sel() : -1;
+      for (let r = 0; r < 7 && s.off + r < items.length; r++) {
+        const idx = s.off + r, y = 33 + r * 13;
+        let x = 3;
+        if (opt.num) { txt(String(idx + 1), 3, y); x = 12; }
+        txt(items[idx], x, y);
+        if (idx === cur) spr(I_CHECK, LW - 16, y + 3);
+        if (idx === s.i) inv(0, y, LW - 6, 13);
+      }
+      if (s.off > 0) spr(I_UP, LW - 5, 35);
+      if (s.off + 7 < items.length) spr(I_DN, LW - 5, 119);
+      soft('選択', '戻る');
+    },
+    key(k) {
+      const n = items.length;
+      if (k === 'U' || k === 'D') { s.i = (s.i + (k === 'U' ? n - 1 : 1)) % n; if (opt.move) opt.move(s.i); paint(); }
+      else if (k === 'OK' || k === 'SL' || (k === 'CALL' && opt.call)) opt.pick(s.i, k);
+      else if (k === 'SR' || k === 'L') pop();
+      else if (opt.num && k >= '1' && k <= '9' && +k <= n) { s.i = +k - 1; paint(); opt.pick(s.i, k); }
+    },
+    enter: opt.enter, leave: opt.leave,
+  };
+  return s;
+}
+
+// ---------- 待受 ----------
+const CAT = [
+  art(['...X......X.............', '..XXX....XXX............', '..XXXX..XXXX............', '..XXXXXXXXXX............', '.XXXXXXXXXXXX...........', '.XX..XXXX..XX...........', '.XX..XXXX..XX...........', '.XXXXXXXXXXXX...........', '.XXXXX..XXXXX...........', '..XXXXXXXXXX........XX..', '...XXXXXXXX........XXX..', '..XXXXXXXXXX.......XX...', '.XXXXXXXXXXXX......XX...', '.XXXXXXXXXXXX.....XXX...', '.XXXXXXXXXXXXXXXXXXX....', '.XXXXXXXXXXXXXXXXX......', '..XXXX....XXXX..........']),
+  art(['...X......X.............', '..XXX....XXX............', '..XXXX..XXXX............', '..XXXXXXXXXX............', '.XXXXXXXXXXXX...........', '.XXXXXXXXXXXX...........', '.XX..XXXX..XX...........', '.XXXXXXXXXXXX...........', '.XXXXX..XXXXX...........', '..XXXXXXXXXX............', '...XXXXXXXX.............', '..XXXXXXXXXX............', '.XXXXXXXXXXXX........XX.', '.XXXXXXXXXXXX......XXXX.', '.XXXXXXXXXXXXXXXXXXXX...', '.XXXXXXXXXXXXXXXXX......', '..XXXX....XXXX..........']),
+];
+const FISH = art(['....XXXXX.......', '..XXXXXXXXX...X.', '.XX.XXXXXXXX.XX.', 'XXXXXXXXXXXXXXX.', '.XXXXXXXXXXX.XX.', '..XXXXXXXXX...X.', '....XXXXX.......']);
+const MOON = art(['...XXXX...', '.XXXX.....', '.XXX......', 'XXXX......', 'XXXX......', 'XXXX......', 'XXXXX.....', '.XXXXX...X', '.XXXXXXXXX', '...XXXXX..']);
+const NOTE_A = art(['..XXX', '..X.X', '..X..', '..X..', 'XXX..', 'XXX..']);
+const STARS = [[8, 96], [26, 108], [46, 94], [62, 114], [74, 100], [104, 118], [14, 118], [38, 120], [86, 106], [56, 104]];
+const CLOUD = G('........XXXXXXXX......../....XXXX........XXXX..../..XX................XX../.X....................X./X......................X/X......................X/.X....................X./..XX................XX../....XXXX........XXXX..../........XXXXXXXX........');
+// 山の左右のふち。写真の16行ぶんを読み取ったもので、あいだは補う
+const FUJI_L = [52, 50, 48, 48, 46, 44, 44, 40, 38, 36, 34, 30, 28, 24, 22, 18];
+const FUJI_R = [65, 67, 67, 69, 71, 73, 73, 77, 77, 79, 81, 85, 89, 93, 95, 99];
+function fuji() {   // 山肌は4ドットに3ドットを打って濃い灰色に見せ、頂上はぎざぎざの線から上を白く抜く
+  for (let j = 0; j < 32; j++) {
+    const i = j >> 1, k = Math.min(15, i + 1), t = (j & 1) / 2, y = 92 + j;
+    const l = Math.round(FUJI_L[i] + (FUJI_L[k] - FUJI_L[i]) * t), r = Math.round(FUJI_R[i] + (FUJI_R[k] - FUJI_R[i]) * t);
+    for (let x = l; x <= r; x++) {
+      const edge = j < 2 || x < l + 2 || x > r - 2, snow = j < 11 + Math.abs((x + 3) % 6 - 3);
+      if (edge || (!snow && !((x & 1) && (y & 1)))) px(x, y);
+    }
+  }
+  spr(CLOUD, 6, 92); spr(CLOUD, 86, 96);
+}
+const WALLS = ['ふじさん', 'ネコ', 'さかな', 'ほしぞら', 'とけいのみ'];
+function wallpaper(w, f) {
+  if (w === 0) fuji();
+  else if (w === 1) {
+    spr(CAT[f & 1], 34, 88, 2);
+    if (f & 1) spr(NOTE_A, 16, 92); else spr(NOTE_A, 20, 88);
+    box(26, 122, 64, 1);
+  } else if (w === 2) {
+    const x = LW - (f * 4) % (LW + 40);
+    spr(FISH, x, 96 + ((f >> 1) & 1), 2);
+    const bx = x - 8, by = 102 - (f % 5) * 2;
+    frame(bx, by, 3, 3); if (f % 3) frame(bx + 5, by - 6, 2, 2);
+    for (let i = 0; i < LW; i++) px(i, 120 + (((i + f) >> 2) & 1));
+  } else if (w === 3) {
+    spr(MOON, 92, 90, 1);
+    STARS.forEach(([sx, sy], i) => {
+      const on = (i * 7 + f) % 5;
+      px(sx, sy);
+      if (on < 3) { px(sx - 1, sy); px(sx + 1, sy); px(sx, sy - 1); px(sx, sy + 1); }
+      if (on === 0) { px(sx - 2, sy); px(sx + 2, sy); px(sx, sy - 2); px(sx, sy + 2); }
+    });
+    const t = f % 14;
+    if (t < 4) for (let i = 0; i < 5; i++) px(30 + t * 9 + i, 92 + t * 4 + (i >> 1));
+  }
+}
+const pad2 = n => String(n).padStart(2, '0');
+const MODEL = 'OSS O501i';
+const Standby = {
+  f: 0, acc: 0, tall: true,
+  // 写真の待受と同じ並び：機種名（太字14ドット）、日付（14ドット）、時刻（18ドット）、山、枠つきの下の帯
+  draw() {
+    const d = new Date(), clock = S.wall === 4, dy = clock ? 46 : 50, ty = clock ? 70 : 64;
+    const md = (d.getMonth() + 1) + '/' + d.getDate() + '(', wd = '日月火水木金土'[d.getDay()];
+    const hm = d.getHours() + (this.f & 1 ? ' ' : ':') + pad2(d.getMinutes());
+    if (!clock) gtxt(N14, MODEL, (LW - gw(N14, MODEL, 2)) >> 1, 28, 2);
+    let x = gtxt(D14, md, (LW - gw(D14, md, 2) - 21) >> 1, dy, 2);
+    txt(wd, x, dy + 1); txt(wd, x + 1, dy + 1);          // 曜日は12ドットの字を重ねて太らせる
+    spr(D14[')'], x + 15, dy);
+    x = (LW - hm.length * 12) >> 1;
+    for (const ch of hm) { if (ch !== ' ') spr(T26[ch], x, ty); x += 12; }
+    if (!clock) wallpaper(S.wall, this.f);
+    softFrame(); spr(I_ENV, 4, 132); hk('メール', 24, 132); hk('メニュー', 74, 132);
+  },
+  tick(dt) { this.acc += dt; if (this.acc >= 0.5) { this.acc = 0; this.f++; return true; } return false; },
+  key(k) {
+    if (k === 'SL' || k === 'OK') push(Menu());
+    else if (k === 'MAIL') push(Mail());
+    else if (k === 'BOOK') push(Book());
+    else if (DTMF[k]) push(Dial(k));
+  },
+};
+
+// ---------- メニュー ----------
+function Menu() {
+  const make = [Tone, Wall, Light, Book, Calc, Game, About];
+  return List('メニュー', ['着信音選択', '待受画面', 'バックライト', '電話帳', '電卓', 'もぐらたたき', '端末情報'], { num: true, pick: i => push(make[i]()) });
+}
+function Tone() {
+  return List('着信音選択', TONES.map(t => t.name), {
+    sel: () => S.tone, move: i => playSeq(TONES[i].s), enter() { playSeq(TONES[S.tone].s); }, leave: stopSeq,
+    pick: i => { S.tone = i; stopSeq(); say('設定しました', pop); },
+  });
+}
+function Wall() {
+  return List('待受画面', WALLS, { sel: () => S.wall, pick: i => { S.wall = i; say('設定しました', home); } });
+}
+function Light() {
+  const before = S.bl;
+  let kept = false;
+  return List('バックライト', BLS.map(b => b.name), {
+    sel: () => (kept ? S.bl : before), move: i => { S.bl = i; }, leave() { if (!kept) S.bl = before; },
+    pick: i => { S.bl = i; kept = true; say('設定しました', pop); },
+  });
+}
+const BOOK = [['じたく', '0000-00-0001'], ['かいしゃ', '0000-00-0002'], ['おばあちゃん', '0000-00-0003'], ['時報', '117'], ['天気予報', '177']];
+function Book() {
+  return List('電話帳', BOOK.map(b => b[0]), { call: true, pick: i => push(Calling(BOOK[i][1], BOOK[i][0])) });
+}
+const MAILS = [
+  ['ようこそ', ['OSS O501i を', '手にとってくれて', 'ありがとう。']],
+  ['おばあちゃん', ['またあそびに', 'おいでね。', 'まっています。']],
+];
+function Mail() {
+  return List('受信メール', MAILS.map(m => m[0]), { num: true, pick: i => push(MailBody(MAILS[i])) });
+}
+function MailBody(m) {
+  return {
+    draw() {
+      title(m[0]);
+      m[1].forEach((line, i) => txt(line, 3, 30 + i * 15));
+      soft('', '戻る');
+    },
+    key(k) { if (k === 'SR' || k === 'OK' || k === 'L') pop(); },
+  };
+}
+const HAND = art(['.XXXXXXXXXXXX.', 'XXXXXXXXXXXXXX', 'XXXX......XXXX', 'XXXX......XXXX', '.XX........XX.']);
+
+// ---------- 発信・着信 ----------
+function Dial(first) {
+  let num = first;
+  return {
+    dialTone: true,
+    draw() {
+      title('ダイヤル');
+      const big = num.length <= 9;
+      if (big) rtxt(num, LW - 2, 44, 2);
+      else { rtxt(num.slice(0, num.length - 9), LW - 2, 34, 1); rtxt(num.slice(-9), LW - 2, 50, 2); }
+      soft('発信', 'クリア');
+    },
+    key(k) {
+      if (DTMF[k]) { if (num.length < 18) num += k; paint(); }
+      else if (k === 'SR') { num = num.slice(0, -1); if (num) paint(); else pop(); }
+      else if (k === 'CALL' || k === 'OK' || k === 'SL') { stack.pop(); push(Calling(num, '')); }
+    },
+  };
+}
+function Calling(num, name) {
+  let t = 0, f = 0, sec = -1, tm = 0;
+  const jiho = num === '117';
+  return {
+    enter() { tm = setTimeout(() => beep(400, 1, 415, 0.04), 500); },
+    leave() { clearTimeout(tm); },
+    draw() {
+      if (jiho && t > 2) {
+        const d = new Date();
+        title('時報');
+        ctxt(pad2(d.getHours()) + ':' + pad2(d.getMinutes()), 36, 2);
+        ctxt(pad2(d.getSeconds()) + '秒', 66, 2);
+      } else if (t > 4.5) {
+        ctxt('ただいま', 34); ctxt('電話に出る', 48); ctxt('ことができません', 62);
+      } else {
+        title('発信中');
+        if (name) ctxt(name, 32);
+        ctxt(num, 48);
+        spr(HAND, 51, 72);
+        for (let i = 0; i < 3; i++) if ((f % 4) > i) { box(44 - i * 8, 74, 3, 3); box(69 + i * 8, 74, 3, 3); }
+      }
+      soft('', '終了');
+    },
+    tick(dt) {
+      t += dt;
+      if (jiho && t > 2) { const s = new Date().getSeconds(); if (s !== sec) { sec = s; beep(s % 10 === 0 ? 1760 : 880, s % 10 === 0 ? 0.5 : 0.08); return true; } return false; }
+      if (!jiho && t > 7) { home(); return false; }
+      const nf = Math.floor(t * 3);
+      if (nf !== f) { f = nf; return true; }
+      return false;
+    },
+    key(k) { if (k === 'END' || k === 'SR') home(); },
+  };
+}
+function Incoming() {
+  let t = 0, f = 0;
+  return {
+    enter() { ringing = true; playSeq(TONES[S.tone].s, 0.6); },
+    leave() { ringing = false; stopSeq(); setLed(false); },
+    draw() {
+      title('着信中');
+      if (f & 1) { spr(HAND, 51, 34); box(42, 30, 2, 6); box(36, 28, 2, 10); box(72, 30, 2, 6); box(78, 28, 2, 10); }
+      else spr(HAND, 51, 36);
+      ctxt('おばあちゃん', 52, 1);
+      ctxt('0000-00-0003', 68);
+      soft('応答', '切る');
+    },
+    tick(dt) {
+      t += dt;
+      if (t > 24) { home(); return false; }
+      const nf = Math.floor(t * 4);
+      if (nf !== f) { f = nf; setLed(!!(f & 1)); return true; }
+      return false;
+    },
+    key(k) {
+      if (k === 'CALL' || k === 'OK' || k === 'SL') { const s = stack.pop(); s.leave(); push(Talking()); }
+      else if (k === 'END' || k === 'SR') home();
+    },
+  };
+}
+function Talking() {
+  let t = 0, sec = 0;
+  return {
+    talking: true,
+    draw() {
+      title('通話中');
+      ctxt('おばあちゃん', 34);
+      ctxt(Math.floor(sec / 60) + ':' + pad2(sec % 60), 56, 2);
+      soft('', '終了');
+    },
+    tick(dt) { t += dt; if (Math.floor(t) !== sec) { sec = Math.floor(t); return true; } return false; },
+    key(k) { if (k === 'END' || k === 'SR') home(); },
+  };
+}
+function ring() {
+  if (ringing || top().talking) return;
+  toast = null;
+  if (top() !== Standby) home();
+  push(Incoming());
+}
+
+// ---------- 電卓 ----------
+function Calc() {
+  let acc = null, cur = '0', op = '', fresh = true;
+  const fmt = v => { if (!isFinite(v)) return 'エラー'; let s = String(+v.toPrecision(8)); if (s.length > 9) s = v.toExponential(3); return s; };
+  const apply = () => {
+    const v = parseFloat(cur);
+    if (acc === null || !op) acc = v;
+    else acc = op === '+' ? acc + v : op === '-' ? acc - v : op === '×' ? acc * v : acc / v;
+  };
+  return {
+    draw() {
+      title('電卓');
+      if (op) txt(op, 3, 34);
+      rtxt(cur, LW - 2, 32, cur.length > 9 ? 1 : 2);
+      box(0, 62, LW, 1);
+      txt('▲+ ▼- ←× →÷', 3, 66);
+      txt('決定:=  *:小数点', 3, 80);
+      soft('', 'クリア');
+    },
+    key(k) {
+      if (k >= '0' && k <= '9') { if (fresh || cur === '0') cur = k; else if (cur.length < 9) cur += k; fresh = false; }
+      else if (k === '*') { if (fresh) { cur = '0.'; fresh = false; } else if (!cur.includes('.')) cur += '.'; }
+      else if (k === 'U' || k === 'D' || k === 'L' || k === 'R') { if (!fresh || acc === null) apply(); op = { U: '+', D: '-', L: '×', R: '÷' }[k]; cur = fmt(acc); fresh = true; }
+      else if (k === 'OK' || k === '#') { if (op) { apply(); op = ''; cur = fmt(acc); acc = null; fresh = true; } }
+      else if (k === 'SR') { if (cur === '0' && !op) { pop(); return; } acc = null; cur = '0'; op = ''; fresh = true; }
+      else return;
+      paint();
+    },
+  };
+}
+
+// ---------- もぐらたたき ----------
+const MOLE = art(['...XXXXXX...', '.XXXXXXXXXX.', '.XX.XXXX.XX.', '.XXXXXXXXXX.', 'XXXXX..XXXXX', 'XXXXXXXXXXXX', 'XXXXXXXXXXXX']);
+const POW = art(['X..X..X', '.X.X.X.', '..XXX..', 'XXXXXXX', '..XXX..', '.X.X.X.', 'X..X..X']);
+function Game() {
+  let t, score, mole, mt, hit, over;
+  const reset = () => { t = 20; score = 0; mole = -1; mt = 0.6; hit = -1; over = false; };
+  reset();
+  return {
+    draw() {
+      txt('もぐら', 2, 12); rtxt(score + 'てん', LW - 2, 12);
+      for (let i = 0; i < 9; i++) {
+        const cx = 23 + 35 * (i % 3), cy = 36 + 22 * (i / 3 | 0);
+        box(cx - 11, cy + 8, 22, 1); box(cx - 9, cy + 9, 18, 1);
+        txt(String(i + 1), cx + 9, cy - 5);
+        if (mole === i) spr(MOLE, cx - 6, cy + 1);
+        if (hit === i) spr(POW, cx - 4, cy);
+      }
+      frame(7, 97, 102, 5); box(8, 98, Math.max(0, Math.round(t / 20 * 100)), 3);
+      if (over) { box(18, 38, 80, 44, 0); frame(18, 38, 80, 44); ctxt('おしまい', 42); ctxt(score + 'てん', 56); ctxt('決定:もう一度', 68); }
+      soft('', '戻る');
+    },
+    tick(dt) {
+      if (over) return false;
+      t -= dt; mt -= dt;
+      if (t <= 0) { over = true; mole = -1; beep(523, 0.3); return true; }
+      if (mt <= 0) { let n; do { n = Math.random() * 9 | 0; } while (n === mole); mole = n; hit = -1; mt = 0.55 + Math.random() * 0.5; }
+      return true;
+    },
+    key(k) {
+      if (k === 'SR') pop();
+      else if (over) { if (k === 'OK') { reset(); paint(); } }
+      else if (k >= '1' && k <= '9') {
+        const i = +k - 1;
+        if (i === mole) { score++; hit = i; mole = -1; mt = 0.3; beep(1568, 0.07); } else beep(196, 0.1);
+        paint();
+      }
+    },
+  };
+}
+function About() {
+  return {
+    draw() {
+      title('端末情報');
+      txt('機種 O501i', 3, 28);
+      txt('層   ' + NL + '枚', 3, 42);
+      txt('液晶 ' + LW + '×' + LH, 3, 56);
+      txt('傾き 32°/12°', 3, 70);
+      txt('電波 3本', 3, 84);
+      soft('', '戻る');
+    },
+    key(k) { if (k === 'SR' || k === 'OK' || k === 'L') pop(); },
+  };
+}
+
+function press(k) {
+  if (toast) return;
+  const dt = DTMF[k];
+  if (dt && (top() === Standby || top().dialTone)) beep(dt[0], 0.12, dt[1], 0.04); else beep(k === 'END' ? 880 : 1319, 0.035);
+  const was = pressed;
+  pressed = k; repaintKey(k);
+  if (was && was !== k) repaintKey(was);   // 続けて押したとき、前のキーの色を戻す
+  clearTimeout(press.t);
+  press.t = setTimeout(() => { const p = pressed; pressed = null; if (p) repaintKey(p); }, 140);
+  if (k === 'END') { if (top() !== Standby) home(); return; }
+  if (k === 'MUTE') { setSound(!S.sound); say(S.sound ? '消音 オフ' : '消音 オン'); return; }
+  top().key(k);
+}
+function setSound(on) {
+  S.sound = on; document.getElementById('sound').checked = on;
+  if (!on) stopSeq();
+}
+function uiTick(dt) {
+  if (toast) {
+    toast.t -= dt;
+    if (toast.t <= 0) { const th = toast.then; toast = null; if (th) th(); else paint(); if (!toast) paint(); }
+    return;
+  }
+  const s = top();
+  if (s.tick && s.tick(dt) && top() === s) paint();
+}
+
+// ====================================================================
+// 描画
+// ====================================================================
+const cv = document.getElementById('view'), ctx = cv.getContext('2d');
+const badge = document.getElementById('badge');
+const $ = id => document.getElementById(id);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FOCUS = { all: [1, PY + 10, ZT / 2 - 4], lcd: [2.6, -LCU * S2, CZ + LCU * C2], keys: [2.1, 162 * S1, CZ - 162 * C1] };
+const st = { ang: 0.25, base: 0.25, elev: 30, mode: 'aa', motion: reduce ? 'stop' : 'sway', outline: true, spread: 1, focus: 'all', zoom: 1, fy: FOCUS.all[1], fz: FOCUS.all[2] };
+let dirty = true, vw = null, lowQ = false, slow = 0, drew = false;
+const off = mk(1, 1), octx = off.getContext('2d');
+const sil = mk(1, 1), sctx = sil.getContext('2d');
+const INK = '#14181d';
+function size(c, w, h) { if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } }
+
+function render(now) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const cw = Math.max(1, Math.round(cv.clientWidth * dpr)), ch = Math.max(1, Math.round(cv.clientHeight * dpr));
+  size(cv, cw, ch);
+  const e = st.elev * Math.PI / 180, sq = Math.sin(e), lf = Math.cos(e), sp = st.spread;
+  const fit = Math.min(cw / 384, ch / (ZT * sp * lf + 325 * sq + 40));
+  const s0 = fit * st.zoom, a = st.ang + (ringing && !reduce ? Math.sin(now * 0.07) * 0.012 : 0);
+  const vib = ringing && !reduce ? Math.sin(now * 0.09) * 1.4 : 0;
+  const exploded = sp > 1.001, stepK = exploded ? 5 : 1;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cw, ch);
+
+  if (st.mode === 'aa') {
+    const SS = dpr >= 2 || s0 > 1.5 || lowQ ? 1 : 2, s = s0 * SS;   // 小さく映るときだけ2倍で描いて縮める
+    size(off, cw * SS, ch * SS); size(sil, cw * SS, ch * SS);
+    const cx = off.width / 2 + vib * s, gy = off.height / 2 - ((st.fy - PY) * sq - st.fz * sp * lf) * s;
+    vw = { cx, gy, s, k: 1 / SS, a, sq, lf };
+    shadow(cx / SS, gy / SS, s0, sq, a);
+    octx.setTransform(1, 0, 0, 1, 0, 0);
+    octx.clearRect(0, 0, off.width, off.height);
+    octx.imageSmoothingEnabled = true; octx.imageSmoothingQuality = 'low';
+    const c = Math.cos(a) * s, sn = Math.sin(a) * s, m = 180 * s;
+    for (let k = 0; k < built; k += stepK) {
+      const L = layers[k], ty = gy - L.z * sp * lf * s;
+      if (ty < -m || ty > off.height + m) continue;
+      const sub = exploded ? 1 : Math.max(1, Math.ceil(L.th * lf * s / 2.5));
+      for (let j = 0; j < sub; j++) {
+        const dz = (j / sub - 0.5) * L.th, oy = L.oy + L.doy * dz - PY;
+        octx.setTransform(c, sn * sq, -sn, c * sq, cx, ty - dz * lf * s);
+        octx.drawImage(L.c, L.ox - PX, oy);
+        if (L.lcdRow >= 0) octx.drawImage(lcd3, 0, L.lcdRow * 3 + 1, LW, 1, LX0 - PX, oy + L.face - 6, LW, 6);
+      }
+    }
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    if (st.outline) {
+      // 輪郭は影絵を少しずつずらして重ねる。端末が映っている範囲だけ処理する
+      const r = 1.5 * dpr, n = lowQ ? 4 : 8, R = 202 * s0 + r + 2;
+      const x0 = Math.max(0, Math.floor(cx / SS - R)), x1 = Math.min(cw, Math.ceil(cx / SS + R));
+      const y0 = Math.max(0, Math.floor(gy / SS - (ZT * sp * lf + 194 * sq) * s0 - r - 2)), y1 = Math.min(ch, Math.ceil(gy / SS + 194 * sq * s0 + r + 2));
+      if (x1 > x0 && y1 > y0) {
+        silhouette(x0 * SS, y0 * SS, (x1 - x0) * SS, (y1 - y0) * SS);
+        for (let q = 0; q < n; q++) {
+          const t = (q + 0.5) / n * Math.PI * 2;
+          ctx.drawImage(sil, x0 * SS, y0 * SS, (x1 - x0) * SS, (y1 - y0) * SS, x0 + Math.cos(t) * r, y0 + Math.sin(t) * r, x1 - x0, y1 - y0);
+        }
+      }
+    }
+    ctx.drawImage(off, 0, 0, cw, ch);
+  } else {
+    const P = Math.max(1, Math.round(s0));
+    const lw = Math.ceil(cw / P), lh = Math.ceil(ch / P);
+    size(off, lw, lh); size(sil, lw, lh);
+    const cx = (lw >> 1) + Math.round(vib), gy = Math.round(lh / 2 - ((st.fy - PY) * sq - st.fz * sp * lf));
+    vw = { cx, gy, s: 1, k: P, a, sq, lf };
+    shadow(cx * P, gy * P, P, sq, a);
+    octx.setTransform(1, 0, 0, 1, 0, 0);
+    octx.clearRect(0, 0, lw, lh);
+    octx.imageSmoothingEnabled = false;
+    const c = Math.cos(a), sn = Math.sin(a);
+    for (let k = 0; k < built; k += stepK) {
+      const L = layers[k], ty = gy - Math.round(L.z * sp * lf);
+      if (ty < -180 || ty > lh + 180) continue;
+      const oy = Math.round(L.oy) - PY;
+      octx.setTransform(c, sn * sq, -sn, c * sq, cx, ty);
+      octx.drawImage(L.c, L.ox - PX, oy);
+      if (L.lcdRow >= 0) octx.drawImage(lcd3, 0, L.lcdRow * 3 + 1, LW, 1, LX0 - PX, oy + L.face - 6, LW, 6);
+    }
+    ctx.imageSmoothingEnabled = false;
+    if (st.outline) {
+      silhouette(0, 0, lw, lh);
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) ctx.drawImage(sil, dx * P, dy * P, lw * P, lh * P);
+    }
+    ctx.drawImage(off, 0, 0, lw * P, lh * P);
+  }
+  badge.textContent = built < NL ? '層を積んでいます ' + built + ' / ' + NL
+    : (st.mode === 'aa' ? 'アンチエイリアス：' : '最近傍：') + NL + '層' + (exploded ? '（5枚おきに表示）' : '');
+}
+function silhouette(x, y, w, h) {
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.globalCompositeOperation = 'copy';
+  sctx.imageSmoothingEnabled = false;
+  sctx.drawImage(off, x, y, w, h, x, y, w, h);
+  sctx.globalCompositeOperation = 'source-in';
+  sctx.fillStyle = INK;
+  sctx.fillRect(x, y, w, h);
+}
+function shadow(x, y, s, sq, a) {
+  const d = CRY - PY;
+  ctx.save();
+  ctx.translate(x - d * Math.sin(a) * s, y + d * Math.cos(a) * sq * s + 2 * s * sq); ctx.scale(1, sq);
+  const R = 180 * s, g = ctx.createRadialGradient(0, 0, R * 0.3, 0, 0, R);
+  g.addColorStop(0, 'rgba(10,16,20,.34)'); g.addColorStop(1, 'rgba(10,16,20,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+// 画面上の点 → キー面（斜面）上の位置。面は平らなので 2×2 の連立で解ける。
+function pick(ev) {
+  if (!vw || st.spread > 1.001 || built < NL) return null;
+  const { a, sq, lf } = vw, ca = Math.cos(a), sa = Math.sin(a);
+  if (C1 * lf * ca + S1 * sq < 0.12) return null;   // キー面がこちらを向いていない
+  const r = cv.getBoundingClientRect();
+  const X = ((ev.clientX - r.left) * cv.width / r.width / vw.k - vw.cx) / vw.s;
+  const Y = ((ev.clientY - r.top) * cv.height / r.height / vw.k - vw.gy) / vw.s;
+  const a11 = ca, a12 = -S1 * sa, a21 = sq * sa, a22 = S1 * ca * sq + C1 * lf;
+  const b1 = X - PY * sa, b2 = Y + PY * ca * sq + CZ * lf, det = a11 * a22 - a12 * a21;
+  if (Math.abs(det) < 1e-3) return null;
+  const x = (b1 * a22 - a12 * b2) / det + PX, u = (a11 * b2 - a21 * b1) / det;
+  const ki = keyAt(x, u);
+  return ki ? KEYS[ki - 1].id : null;
+}
+
+// ---------- 入力 ----------
+const radios = (name, fn) => document.querySelectorAll('input[name=' + name + ']').forEach(r => r.addEventListener('change', () => fn(r.value)));
+radios('mode', v => { st.mode = v; dirty = true; });
+radios('focus', v => { st.focus = v; if (v !== 'all') st.base = 0; dirty = true; });
+radios('way', v => { PAL = WAYS[v]; build(); });
+radios('motion', v => { st.motion = v; if (v !== 'spin') st.base = st.ang; });
+document.querySelectorAll('input[name=motion]').forEach(r => { r.checked = r.value === st.motion; });
+$('elev').addEventListener('input', ev => { st.elev = +ev.target.value; $('elev-out').textContent = st.elev + '°'; dirty = true; });
+$('spread').addEventListener('input', ev => { st.spread = +ev.target.value; $('spread-out').textContent = st.spread > 1.001 ? '×' + st.spread.toFixed(2) : 'なし'; dirty = true; });
+$('outline').addEventListener('change', ev => { st.outline = ev.target.checked; dirty = true; });
+$('sound').addEventListener('change', ev => { setSound(ev.target.checked); paint(); });
+$('ring').addEventListener('click', () => { audio(); ring(); });
+$('kp').addEventListener('click', ev => { const b = ev.target.closest('button[data-k]'); if (b) press(b.dataset.k); });
+
+let drag = null;
+cv.addEventListener('pointerdown', ev => {
+  const k = pick(ev);
+  if (k) { press(k); return; }
+  drag = ev.clientX; cv.setPointerCapture(ev.pointerId); cv.classList.add('drag');
+});
+cv.addEventListener('pointermove', ev => {
+  if (drag === null) { cv.classList.toggle('key', !!pick(ev)); return; }
+  st.ang -= (ev.clientX - drag) * 0.012; st.base = st.ang; drag = ev.clientX; dirty = true;
+});
+const endDrag = () => { drag = null; cv.classList.remove('drag'); };
+cv.addEventListener('pointerup', endDrag); cv.addEventListener('pointercancel', endDrag);
+const KEYMAP = { ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R', Enter: 'OK', ' ': 'OK', m: 'SL', M: 'SL', Backspace: 'SR', c: 'CALL', C: 'CALL', Escape: 'END', e: 'MAIL', E: 'MAIL', b: 'BOOK', B: 'BOOK', s: 'MUTE', S: 'MUTE' };
+cv.addEventListener('keydown', ev => {
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  const k = KEYMAP[ev.key] || (DTMF[ev.key] ? ev.key : null);
+  if (!k) return;
+  ev.preventDefault(); press(k);
+});
+new ResizeObserver(() => { dirty = true; }).observe(cv);
+
+let last = performance.now(), tt = 0;
+function tick(now) {
+  const real = (now - last) / 1000, dt = Math.min(0.05, real); last = now;
+  if (drag === null) {
+    if (st.motion === 'spin') { st.ang -= dt * 0.5; dirty = true; }
+    else if (st.motion === 'sway') { tt += dt; const g = st.base + (st.focus === 'all' ? 0.3 : 0.12) * Math.sin(tt * 0.7); if (Math.abs(g - st.ang) > 1e-4) { st.ang += (g - st.ang) * Math.min(1, dt * 6); dirty = true; } }
+    else if (Math.abs(st.base - st.ang) > 1e-3) { st.ang += (st.base - st.ang) * Math.min(1, dt * 6); dirty = true; }
+  }
+  const f = FOCUS[st.focus], kf = Math.min(1, dt * 7);
+  if (Math.abs(f[0] - st.zoom) > 1e-3 || Math.abs(f[1] - st.fy) > 0.05 || Math.abs(f[2] - st.fz) > 0.05) {
+    st.zoom += (f[0] - st.zoom) * kf; st.fy += (f[1] - st.fy) * kf; st.fz += (f[2] - st.fz) * kf; dirty = true;
+  }
+  uiTick(Math.min(0.3, real));
+  if (ringing) dirty = true;
+  // 続けて描いているのにコマが落ちるようなら、2倍描画と輪郭の手数を減らす
+  if (drew && dirty && !lowQ && built === NL && real < 0.5) { slow = real > 0.05 ? slow + 1 : Math.max(0, slow - 1); if (slow > 24) lowQ = true; }
+  drew = dirty;
+  if (dirty) { dirty = false; render(now); }
+  requestAnimationFrame(tick);
+}
+stack.push(Standby);
+paint();
+build();
+requestAnimationFrame(tick);
+})();
+
+</script>
+</body>
+</html>
