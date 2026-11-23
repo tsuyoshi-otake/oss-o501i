@@ -11,7 +11,7 @@
 /* layout: 左に回転ステージ、右に操作盤（表示設定＋キー）。下に層シートと短い解説。 */
 :root{
   --bg:#eef1f2; --panel:#ffffff; --ink:#1c2328; --muted:#5d6a72; --line:#d3dade;
-  --accent:#0b7a8c; --stage:#f6f6f1;
+  --accent:#0b7a8c;
   --display:"DotGothic16","Zen Kaku Gothic New",sans-serif;
   --body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
   color-scheme:light;
@@ -19,20 +19,20 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#14191c; --panel:#1c2327; --ink:#e6ecee; --muted:#93a2aa; --line:#2e393f;
-    --accent:#4fc3d6; --stage:#15191c;
+    --accent:#4fc3d6;
     color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#14191c; --panel:#1c2327; --ink:#e6ecee; --muted:#93a2aa; --line:#2e393f;
-  --accent:#4fc3d6; --stage:#15191c;
+  --accent:#4fc3d6;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.7}
 /* layout: ケータイだけを画面いっぱいに出す。操作パネルは左上のボタンで右から出し入れする */
-.stage{position:fixed;inset:0;background-color:var(--stage);background-repeat:repeat;overflow:hidden}   /* 絵文字の模様は JS で描いて敷く */
+.stage{position:fixed;inset:0;background-color:#f6f6f1;background-repeat:repeat;overflow:hidden}   /* 絵文字の模様は JS で描いて敷く */
 #view{display:block;width:100%;height:100%;cursor:grab;touch-action:pan-y}
 #view.drag{cursor:grabbing}
 #view.key{cursor:pointer}
@@ -1693,14 +1693,13 @@ const cv = document.getElementById('view'), ctx = cv.getContext('2d');
 const badge = document.getElementById('badge');
 const $ = id => document.getElementById(id);
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-// 背景：絵文字を色つきで並べた模様。画面の画素にそろえて描き、縮めずに敷く
-const darkQ = matchMedia('(prefers-color-scheme: dark)');
+// 背景：白地に絵文字を色つきで並べた模様。ダークモードでも白地のまま。画面の画素にそろえて描き、縮めずに敷く
 function backdrop() {
   const dpr = Math.min(window.devicePixelRatio || 1, 3), P = 3, C = 16, cols = 10, rows = 8, k = P * dpr;
   const c = mk(Math.round(cols * C * k), Math.round(rows * C * k)), g = c.getContext('2d');
   for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
     const e = EMOJI[((r * cols + q) * 17 + r * 5) % EMOJI.length];
-    g.fillStyle = darkQ.matches && e.color === '#3a3a3a' ? '#c6ccd0' : e.color;
+    g.fillStyle = e.color;
     const ox = (q * C + 2 + (r & 1 ? 8 : 0)) % (cols * C), oy = r * C + 2;
     for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) if (e.a.bit(x, y)) g.fillRect(Math.round(((ox + x) % (cols * C)) * k), Math.round((oy + y) * k), Math.ceil(k), Math.ceil(k));
   }
@@ -1709,7 +1708,6 @@ function backdrop() {
   el.style.backgroundSize = (cols * C * P) + 'px ' + (rows * C * P) + 'px';
 }
 backdrop();
-darkQ.addEventListener('change', backdrop);
 const FOCUS = { all: [1, PY + 10, ZT / 2 - 4], lcd: [2.6, -LCU * S2, CZ + LCU * C2], keys: [2.1, 162 * S1, CZ - 162 * C1] };
 const st = { ant: 0, antT: 0, ang: 0.25, base: 0.25, elev: 30, mode: 'aa', motion: 'stop', outline: true, spread: 1, focus: 'all', zoom: 1, fy: FOCUS.all[1], fz: FOCUS.all[2] };
 let dirty = true, vw = null, lowQ = false, slow = 0, drew = false;
@@ -1846,10 +1844,29 @@ function antennaHit(ev) {
   const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((X - ax) * dx + (Y - ay) * dy) / (dx * dx + dy * dy || 1)));
   return Math.hypot(X - ax - dx * t, Y - ay - dy * t) < Math.max(10, 20 * vw.s);
 }
+// 伸ばすときは音の高さを上げ、縮めるときは下げる。アニメーション（約0.45秒）と同じ長さ
+function antSound(on, ctx) {
+  const a = ctx || audio();
+  if (!a) return;
+  const t0 = a.currentTime + 0.01, dur = 0.42, sr = a.sampleRate;
+  const noise = (len, fn) => { const b = a.createBuffer(1, len, sr), d = b.getChannelData(0); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * fn(i / len); return b; };
+  const src = a.createBufferSource(); src.buffer = noise(Math.floor(sr * dur), () => 1);
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 7;
+  bp.frequency.setValueAtTime(on ? 1600 : 5600, t0); bp.frequency.exponentialRampToValueAtTime(on ? 5600 : 1600, t0 + dur);
+  const g = a.createGain();
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.16, t0 + 0.04); g.gain.setValueAtTime(0.16, t0 + dur - 0.1); g.gain.linearRampToValueAtTime(0, t0 + dur);
+  src.connect(bp); bp.connect(g); g.connect(a.destination); src.start(t0); src.stop(t0 + dur);
+  for (const [dt, v] of [[0.14, 0.12], [0.28, 0.12], [dur, 0.3]]) {
+    const c = a.createBufferSource(); c.buffer = noise(Math.floor(sr * 0.014), x => Math.exp(-x * 6));
+    const hp = a.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500;
+    const cg = a.createGain(); cg.gain.value = v;
+    c.connect(hp); hp.connect(cg); cg.connect(a.destination); c.start(t0 + dt);
+  }
+}
 function setAnt(on) {
   if (st.antT === (on ? 1 : 0)) return;
   st.antT = on ? 1 : 0; dirty = true;
-  beep(on ? 1568 : 784, 0.05); setTimeout(() => beep(on ? 2093 : 523, 0.06), 70);
+  antSound(on);
   const b = document.getElementById('ant'); if (b) b.textContent = on ? 'アンテナを縮める' : 'アンテナを伸ばす';
   paint();
 }
